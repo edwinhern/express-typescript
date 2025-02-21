@@ -7,6 +7,7 @@ import { openAPIRouter } from "@/api-docs/openAPIRouter";
 import { authRouter } from "@/api/auth/authRouter";
 import { healthCheckRouter } from "@/api/healthCheck/healthCheckRouter";
 import { questionRouter } from "@/api/question/questionRouter";
+import { statsRouter } from "@/api/stats/statsRouter";
 import { userRouter } from "@/api/user/userRouter";
 import errorHandler from "@/common/middleware/errorHandler";
 import rateLimiter from "@/common/middleware/rateLimiter";
@@ -14,7 +15,7 @@ import requestLogger from "@/common/middleware/requestLogger";
 import { env } from "@/common/utils/envConfig";
 import { connectRedis } from "@/common/utils/redisClient";
 import cookieParser from "cookie-parser";
-import { openaiRouter } from "./api/openai/openaiRouter";
+// import { openaiRouter } from "./api/openai/openaiRouter";
 import { connectMongoDB } from "./common/utils/mongoClient";
 
 const logger = pino({ name: "server start" });
@@ -39,8 +40,9 @@ app.use(requestLogger);
 app.use("/health-check", healthCheckRouter);
 app.use("/users", userRouter);
 app.use("/auth", authRouter);
-app.use("/openai", openaiRouter);
+// app.use("/openai", openaiRouter);
 app.use("/questions", questionRouter);
+app.use("/stats", statsRouter);
 
 connectRedis();
 connectMongoDB();
