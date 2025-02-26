@@ -12,6 +12,7 @@ export interface ILocaleSchema {
 }
 
 export enum QuestionType {
+  TrueFalse = "true_false",
   MultipleChoice = "multiple_choice",
   OneChoice = "one_choice",
 }

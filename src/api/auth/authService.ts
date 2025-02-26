@@ -38,9 +38,10 @@ export class AuthService {
         JSON.stringify({
           sessionId,
           refreshToken,
+          questions: [],
           context: [],
         }),
-        { EX: 3600 },
+        { EX: 86400 },
       );
 
       logger.info(`Admin logged in: ${login}`);
@@ -107,8 +108,9 @@ export class AuthService {
           sessionId,
           refreshToken: newRefreshToken,
           context: JSON.parse(sessionData).context,
+          questions: JSON.parse(sessionData).questions,
         }),
-        { EX: 3600 },
+        { EX: 86400 },
       );
 
       return ServiceResponse.success("Token refreshed", {

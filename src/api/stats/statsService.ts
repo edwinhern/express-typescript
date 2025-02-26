@@ -6,7 +6,7 @@ export class StatsService {
   //#region OpenAI Usage Logs
   async logQuestionGeneration(
     categoryId: mongoose.Types.ObjectId,
-    questionIds: mongoose.Types.ObjectId[],
+    questionIds: (string | mongoose.Types.ObjectId)[],
     tokensUsed: number,
     requestPrompt: string,
   ) {

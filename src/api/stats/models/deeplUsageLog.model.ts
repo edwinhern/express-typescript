@@ -1,7 +1,7 @@
 import mongoose, { Schema, type Document } from "mongoose";
 
 export interface IDeepLUsageLog extends Document {
-  questionId: mongoose.Types.ObjectId;
+  // questionId: mongoose.Types.ObjectId;
   charactersUsed: number;
   sourceLanguage: string;
   targetLanguage: string;
@@ -11,7 +11,7 @@ export interface IDeepLUsageLog extends Document {
 
 const DeepLUsageLogSchema = new Schema<IDeepLUsageLog>(
   {
-    questionId: { type: Schema.Types.ObjectId, ref: "Question", required: true },
+    // questionId: { type: Schema.Types.ObjectId, ref: "Question", required: true },
     charactersUsed: { type: Number, required: true },
     sourceLanguage: { type: String, required: true },
     targetLanguage: { type: String, required: true },

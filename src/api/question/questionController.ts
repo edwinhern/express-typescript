@@ -1,12 +1,30 @@
 import type { ServiceResponse } from "@/common/models/serviceResponse";
 import { handleServiceResponse } from "@/common/utils/httpHandlers";
 import type { Request, RequestHandler, Response } from "express";
+import type { GenerateQuestionsDto } from "./dto/generate-questions.dto";
 import type { IQuestion } from "./models/question.model";
 import { questionService, type translatedQuestionResponse } from "./questionService";
 
 export class QuestionController {
   getQuestions: RequestHandler = async (req: Request, res: Response) => {
-    const serviceResponse: ServiceResponse<IQuestion[]> = await questionService.getQuestions();
+    const { limit = 10, page = 1 } = req.query;
+    const serviceResponse = await questionService.getQuestions(+limit, +page);
+
+    handleServiceResponse(serviceResponse, res);
+  };
+
+  getQuestion: RequestHandler = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const serviceResponse = await questionService.getQuestion(id);
+
+    handleServiceResponse(serviceResponse, res);
+  };
+
+  getGeneratedQuestions: RequestHandler = async (req: Request, res: Response) => {
+    const { sessionId } = req.user!;
+    const { limit = 10, page = 1 } = req.query;
+
+    const serviceResponse = await questionService.getGeneratedQuestions(sessionId, +limit, +page);
 
     handleServiceResponse(serviceResponse, res);
   };
@@ -18,24 +36,25 @@ export class QuestionController {
     handleServiceResponse(serviceResponse, res);
   };
 
-  confirmQuestion: RequestHandler = async (req: Request, res: Response) => {
+  approveQuestion: RequestHandler = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const serviceResponse: ServiceResponse<IQuestion | null> = await questionService.confirmQuestion(id);
+    const serviceResponse: ServiceResponse<IQuestion | null> = await questionService.approveQuestion(id);
 
     handleServiceResponse(serviceResponse, res);
   };
 
   rejectQuestion: RequestHandler = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const serviceResponse: ServiceResponse<IQuestion | null> = await questionService.rejectQuestion(id);
+    const { sessionId } = req.user!;
+    const serviceResponse: ServiceResponse<IQuestion | null> = await questionService.rejectQuestion(id, sessionId);
 
     handleServiceResponse(serviceResponse, res);
   };
 
-  confirmQuestionTranslation: RequestHandler = async (req: Request, res: Response) => {
+  approveQuestionTranslation: RequestHandler = async (req: Request, res: Response) => {
     const { id, language } = req.params;
 
-    const serviceResponse = await questionService.confirmQuestionTranslation(id, language);
+    const serviceResponse = await questionService.approveQuestionTranslation(id, language);
 
     handleServiceResponse(serviceResponse, res);
   };
@@ -61,8 +80,9 @@ export class QuestionController {
   };
 
   generateQuestions: RequestHandler = async (req: Request, res: Response) => {
-    const { prompt, max_tokens, count, category } = req.body;
-    const serviceResponse = await questionService.generateQuestions(prompt, max_tokens, count, category);
+    const generateQuestionsDto: GenerateQuestionsDto = req.body;
+    const { sessionId } = req.user!;
+    const serviceResponse = await questionService.generateQuestions(sessionId, generateQuestionsDto);
 
     handleServiceResponse(serviceResponse, res);
   };
@@ -88,6 +108,26 @@ export class QuestionController {
     const { id, language } = req.params;
 
     const serviceResponse = await questionService.deleteQuestionTranslation(id, language);
+
+    handleServiceResponse(serviceResponse, res);
+  };
+
+  confirmQuestion: RequestHandler = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { sessionId } = req.user!;
+
+    const serviceResponse = await questionService.confirmQuestion(sessionId, id);
+
+    handleServiceResponse(serviceResponse, res);
+  };
+
+  updateQuestion: RequestHandler = async (req: Request, res: Response) => {
+    // return res.status(501).json({ message: "Not implemented" });
+
+    const { id } = req.params;
+    const question = req.body;
+
+    const serviceResponse = await questionService.updateQuestion(id, question);
 
     handleServiceResponse(serviceResponse, res);
   };
