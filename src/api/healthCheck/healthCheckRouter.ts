@@ -20,3 +20,15 @@ healthCheckRouter.get("/", (_req: Request, res: Response) => {
   const serviceResponse = ServiceResponse.success("Service is healthy", null);
   return handleServiceResponse(serviceResponse, res);
 });
+
+healthCheckRegistry.registerPath({
+  method: "get",
+  path: "/health-check/error",
+  tags: ["Health Check"],
+  responses: createApiResponse(z.null(), "Error"),
+});
+
+healthCheckRouter.get("/error", (_req: Request, res: Response) => {
+  const serviceResponse = ServiceResponse.failure("Service is unhealthy", null);
+  return handleServiceResponse(serviceResponse, res);
+});
