@@ -2,13 +2,14 @@ import type { ServiceResponse } from "@/common/models/serviceResponse";
 import { handleServiceResponse } from "@/common/utils/httpHandlers";
 import type { Request, RequestHandler, Response } from "express";
 import type { GenerateQuestionsDto } from "./dto/generate-questions.dto";
+import type { GetQuestionFiltersDto } from "./dto/get-question-filters.dto";
 import type { IQuestion } from "./models/question.model";
 import { questionService, type translatedQuestionResponse } from "./questionService";
 
 export class QuestionController {
   getQuestions: RequestHandler = async (req: Request, res: Response) => {
-    const { limit = 10, page = 1 } = req.query;
-    const serviceResponse = await questionService.getQuestions(+limit, +page);
+    // const { limit = 10, page = 1 } = req.query;
+    const serviceResponse = await questionService.getQuestions(req.query as GetQuestionFiltersDto);
 
     handleServiceResponse(serviceResponse, res);
   };
@@ -21,17 +22,17 @@ export class QuestionController {
   };
 
   getGeneratedQuestions: RequestHandler = async (req: Request, res: Response) => {
-    const { sessionId } = req.user!;
     const { limit = 10, page = 1 } = req.query;
 
-    const serviceResponse = await questionService.getGeneratedQuestions(sessionId, +limit, +page);
+    const serviceResponse = await questionService.getGeneratedQuestions(+limit, +page);
 
     handleServiceResponse(serviceResponse, res);
   };
 
-  getQuestionsByCategory: RequestHandler = async (req: Request, res: Response) => {
-    const { category } = req.params;
-    const serviceResponse: ServiceResponse<IQuestion[] | null> = await questionService.getQuestionsByCategory(category);
+  getGeneratedQuestion: RequestHandler = async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    const serviceResponse = await questionService.getGeneratedQuestion(id);
 
     handleServiceResponse(serviceResponse, res);
   };
@@ -79,10 +80,20 @@ export class QuestionController {
     handleServiceResponse(serviceResponse, res);
   };
 
+  translateGeneratedQuestion: RequestHandler = async (req: Request, res: Response) => {
+    const { questionId } = req.params;
+    const { language } = req.body;
+
+    const serviceResponse = await questionService.translateGeneratedQuestion(questionId, language);
+
+    handleServiceResponse(serviceResponse, res);
+  };
+
   generateQuestions: RequestHandler = async (req: Request, res: Response) => {
     const generateQuestionsDto: GenerateQuestionsDto = req.body;
-    const { sessionId } = req.user!;
-    const serviceResponse = await questionService.generateQuestions(sessionId, generateQuestionsDto);
+    // const { sessionId } = req.user!;
+    // const serviceResponse = await questionService.generateQuestions(sessionId, generateQuestionsDto);
+    const serviceResponse = await questionService.generateQuestions(generateQuestionsDto);
 
     handleServiceResponse(serviceResponse, res);
   };
@@ -128,6 +139,15 @@ export class QuestionController {
     const question = req.body;
 
     const serviceResponse = await questionService.updateQuestion(id, question);
+
+    handleServiceResponse(serviceResponse, res);
+  };
+
+  updateGeneratedQuestion: RequestHandler = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const question = req.body;
+
+    const serviceResponse = await questionService.updateGeneratedQuestion(id, question);
 
     handleServiceResponse(serviceResponse, res);
   };

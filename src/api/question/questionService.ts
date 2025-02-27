@@ -8,8 +8,9 @@ import { StatusCodes } from "http-status-codes";
 import type mongoose from "mongoose";
 import { openaiService } from "../openai/openaiService";
 import type { GenerateQuestionsDto } from "./dto/generate-questions.dto";
+import type { GetQuestionFiltersDto } from "./dto/get-question-filters.dto";
 import { CategoryModel } from "./models/category.model";
-import { type IQuestion, QuestionModel, type Status } from "./models/question.model";
+import { type ILocaleSchema, type IQuestion, QuestionModel, type QuestionStatus } from "./models/question.model";
 
 const depplAuthKey = process.env.DEEPL_AUTH_KEY!;
 
@@ -23,23 +24,27 @@ export type translatedQuestionResponse = {
 export class QuestionService {
   deeplClient: Translator = new deepl.Translator(depplAuthKey);
 
-  async getQuestions(
-    limit: number,
-    page: number,
-  ): Promise<
+  async getQuestions(getQuestionFiltersDto: GetQuestionFiltersDto): Promise<
     ServiceResponse<{
       questions: IQuestion[];
       questionsCount: number;
       totalPages: number;
     }>
   > {
+    const { limit, page, difficulty, type, title, status } = getQuestionFiltersDto;
+
     // Проверяем корректность входных параметров
     const validLimit = !limit || limit <= 0 || Number.isNaN(Number(limit)) ? 10 : limit;
     const validPage = !page || page <= 0 || Number.isNaN(Number(page)) ? 1 : page;
 
     // Запросы выполняются параллельно для оптимизации
     const [questions, questionsCount] = await Promise.all([
-      QuestionModel.find()
+      QuestionModel.find({
+        locales: { $elemMatch: { question: { $regex: title || "", $options: "i" } } },
+        difficulty: difficulty ? { $eq: difficulty } : { $exists: true },
+        type: type ? { $eq: type } : { $exists: true },
+        status: status ? { $eq: status } : { $exists: true },
+      })
         .limit(validLimit)
         .skip((validPage - 1) * validLimit)
         .lean(),
@@ -68,17 +73,58 @@ export class QuestionService {
     return ServiceResponse.success("Question found", question);
   }
 
-  async getGeneratedQuestions(sessionId: string, limit: number, page: number) {
-    const session = await redisClient.get(`session:${sessionId}`);
-    const sessionData = JSON.parse(session!);
+  // async getGeneratedQuestions( limit: number, page: number) {
+  //   const session = await redisClient.get(`session:${sessionId}`);
+  //   const sessionData = JSON.parse(session!);
 
-    const questions = sessionData.questions.slice((page - 1) * limit, page * limit);
+  //   const questions = sessionData.questions.slice((page - 1) * limit, page * limit);
 
-    const questionsCount = sessionData.questions.length;
+  //   const questionsCount = sessionData.questions.length;
+  //   const totalPages = Math.ceil(questionsCount / limit);
+
+  //   return ServiceResponse.success<{
+  //     questions: any[];
+  //     questionsCount: number;
+  //     totalPages: number;
+  //   }>("Questions found", {
+  //     questions,
+  //     questionsCount,
+  //     totalPages,
+  //   });
+  // }
+
+  async getGeneratedQuestions(
+    limit: number,
+    page: number,
+  ): Promise<
+    ServiceResponse<{
+      questions: IQuestion[];
+      questionsCount: number;
+      totalPages: number;
+    }>
+  > {
+    // Получаем все ключи вопросов
+    const questionKeys = await redisClient.keys("question:*");
+
+    const questionsCount = questionKeys.length;
     const totalPages = Math.ceil(questionsCount / limit);
 
+    // Разбиваем на страницы
+    const slicedKeys = questionKeys.slice((page - 1) * limit, page * limit);
+
+    // Загружаем вопросы из Redis
+    const questionsData = await Promise.all(
+      slicedKeys.map(async (key) => {
+        const data = await redisClient.get(key);
+        return data ? JSON.parse(data) : null;
+      }),
+    );
+
+    // Фильтруем null (если вдруг какой-то ключ был, но данные не загрузились)
+    const questions = questionsData.filter((q) => q !== null) as IQuestion[];
+
     return ServiceResponse.success<{
-      questions: any[];
+      questions: IQuestion[];
       questionsCount: number;
       totalPages: number;
     }>("Questions found", {
@@ -88,14 +134,14 @@ export class QuestionService {
     });
   }
 
-  async getQuestionsByCategory(category: string): Promise<ServiceResponse<IQuestion[] | null>> {
-    const questions = await QuestionModel.find({ category });
+  async getGeneratedQuestion(questionId: string): Promise<ServiceResponse<IQuestion | null>> {
+    const question = await redisClient.get(`question:${questionId}`);
 
-    if (!questions || questions.length === 0) {
-      return ServiceResponse.failure("No Questions found", null, StatusCodes.NOT_FOUND);
+    if (!question) {
+      return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
     }
 
-    return ServiceResponse.success<IQuestion[]>("Questions found", questions);
+    return ServiceResponse.success("Question found", JSON.parse(question));
   }
 
   async saveQuestions(questions: IQuestion[], categoryId: mongoose.Types.ObjectId) {
@@ -132,11 +178,11 @@ export class QuestionService {
   }
 
   async generateQuestions(
-    sessionId: string,
+    // sessionId: string,
     generateQuestionsDto: GenerateQuestionsDto,
   ): Promise<
     ServiceResponse<{
-      questions: any[];
+      questions: IQuestion[];
       totalTokensUsed: number;
       completionTokensUsed: number;
     } | null>
@@ -146,50 +192,57 @@ export class QuestionService {
       const { questions, totalTokensUsed, completionTokensUsed } =
         await openaiService.generateQuestionsV2(generateQuestionsDto);
 
-      if (requiredLanguages.length > 1) {
-        const neededLanguages = requiredLanguages.filter(
-          (language) => !questions[0].locales.some((locale) => locale.language === language),
-        );
+      // if (requiredLanguages.length > 1) {
+      //   const neededLanguages = requiredLanguages.filter(
+      //     (language) => !questions[0].locales.some((locale) => locale.language === language),
+      //   );
 
-        for (const language of neededLanguages) {
-          await Promise.all(
-            questions.map(async (question) => {
-              const translatedQuestion = await this.deeplClient.translateText(
-                question.locales[0].question,
-                null,
-                language as TargetLanguageCode,
-              );
+      //   for (const language of neededLanguages) {
+      //     await Promise.all(
+      //       questions.map(async (question) => {
+      //         const translatedQuestion = await this.deeplClient.translateText(
+      //           question.locales[0].question,
+      //           null,
+      //           language as TargetLanguageCode,
+      //         );
 
-              const translatedAnswers = await Promise.all([
-                ...question.locales[0].wrong.map((answer) =>
-                  this.deeplClient.translateText(answer, null, language as TargetLanguageCode),
-                ),
-                this.deeplClient.translateText(question.locales[0].correct, null, language as TargetLanguageCode),
-              ]);
+      //         const translatedAnswers = await Promise.all([
+      //           ...question.locales[0].wrong.map((answer) =>
+      //             this.deeplClient.translateText(answer, null, language as TargetLanguageCode),
+      //           ),
+      //           this.deeplClient.translateText(question.locales[0].correct, null, language as TargetLanguageCode),
+      //         ]);
 
-              const newLocale = {
-                language,
-                question: translatedQuestion.text,
-                correct: translatedAnswers.pop()!.text,
-                wrong: translatedAnswers.map((answer) => answer.text),
-                isValid: false,
-              };
+      //         const newLocale = {
+      //           language,
+      //           question: translatedQuestion.text,
+      //           correct: translatedAnswers.pop()!.text,
+      //           wrong: translatedAnswers.map((answer) => answer.text),
+      //           isValid: false,
+      //         };
 
-              question.locales.push(newLocale);
-            }),
-          );
-        }
-      }
+      //         question.locales.push(newLocale);
+      //       }),
+      //     );
+      //   }
+      // }
 
       const categoryModel = await this.findOrCreateCategory(category);
       const categoryModelId = categoryModel._id as mongoose.Types.ObjectId;
 
-      const session = await redisClient.get(`session:${sessionId}`);
-      const sessionData = JSON.parse(session!);
-      sessionData.questions.push(...questions);
-      await redisClient.set(`session:${sessionId}`, JSON.stringify(sessionData), { EX: 86400 });
+      // const session = await redisClient.get(`session:${sessionId}`);
+      // const sessionData = JSON.parse(session!);
+      // sessionData.questions.push(...questions);
+      // await redisClient.set(`session:${sessionId}`, JSON.stringify(sessionData), { EX: 86400 });
 
       const questionsIds: string[] = questions.map((question) => question.id);
+      questions.forEach(async (question) => {
+        question.requiredLanguages = requiredLanguages;
+        question.categoryId = categoryModelId;
+        question.createdAt = new Date();
+        question.updatedAt = new Date();
+        await redisClient.set(`question:${question.id}`, JSON.stringify(question), { EX: 86400 });
+      });
 
       await statsService.logQuestionGeneration(categoryModelId, questionsIds, totalTokensUsed, prompt);
 
@@ -211,91 +264,18 @@ export class QuestionService {
       );
     }
   }
-
-  // async translateQuestion(
-  //   questionId: string,
-  //   language: TargetLanguageCode,
-  // ): Promise<ServiceResponse<translatedQuestionResponse | null>> {
-  //   // Find the question
-  //   const question = await QuestionModel.findById(questionId);
-
-  //   // Find the English locale
-  //   const englLocale = question?.locales.find((locale) => locale.language === "en");
-
-  //   // Check if the question or English locale is not found
-  //   if (!question || !englLocale) {
-  //     return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
-  //   }
-
-  //   // Translate the question and answers
-  //   const translatedQuestion = await this.deeplClient.translateText(englLocale.question, null, language);
-  //   const translatedAnswers = await Promise.all([
-  //     ...englLocale.wrong.map((answer) => this.deeplClient.translateText(answer, null, language)),
-  //     this.deeplClient.translateText(englLocale.correct, null, language),
-  //   ]);
-
-  //   // Create a new locale with the translated question and answers
-  //   const newLocale = {
-  //     language,
-  //     question: translatedQuestion.text,
-  //     correct: translatedAnswers.pop()!.text,
-  //     wrong: translatedAnswers.map((answer) => answer.text),
-  //     isValid: false,
-  //   };
-
-  //   // Update the question with the new locale
-  //   if (question.locales.some((locale) => locale.language === language)) {
-  //     question.locales = question.locales.map((locale) => (locale.language === language ? newLocale : locale));
-  //   } else {
-  //     question.locales.push(newLocale);
-  //   }
-
-  //   // Save the question
-  //   await question.save();
-
-  //   // Log the usage of DeepL for the question and answers
-  //   await statsService.logDeepLUsage(
-  //     question._id as mongoose.Types.ObjectId,
-  //     translatedQuestion.billedCharacters,
-  //     "en",
-  //     language,
-  //     englLocale.question,
-  //   );
-
-  //   await Promise.all(
-  //     translatedAnswers.map((answer) =>
-  //       statsService.logDeepLUsage(
-  //         question._id as mongoose.Types.ObjectId,
-  //         answer.billedCharacters,
-  //         "en",
-  //         language,
-  //         answer.text,
-  //       ),
-  //     ),
-  //   );
-
-  //   // Return the translated question and answers with the billed characters
-  //   return ServiceResponse.success<translatedQuestionResponse>("Question translated", {
-  //     question: translatedQuestion.text,
-  //     correct: newLocale.correct,
-  //     wrong: newLocale.wrong,
-  //     billedCharacters:
-  //       translatedQuestion.billedCharacters +
-  //       translatedAnswers.reduce((acc, answer) => acc + answer.billedCharacters, 0),
-  //   });
-  // }
-
-  async translateQuestion(
+  async translateQuestionBase(
+    getQuestion: () => Promise<any>,
     questionId: string,
     language: TargetLanguageCode,
   ): Promise<ServiceResponse<translatedQuestionResponse | null>> {
-    const question = await QuestionModel.findById(questionId).lean();
+    const question = await getQuestion();
 
     if (!question) {
       return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
     }
 
-    const firstLocale = question.locales[0];
+    const firstLocale: ILocaleSchema = question.locales[0];
 
     const [translatedQuestion, ...translatedAnswers] = await Promise.all([
       this.deeplClient.translateText(firstLocale.question, null, language),
@@ -311,27 +291,20 @@ export class QuestionService {
       isValid: false,
     };
 
-    //пока сохранять не будем, а просто запишем логи и вернем результат
-
-    //тут нужно залогать использование DeepL для вопроса и ответов
-    await Promise.all([
+    const logDeepLUsagePromises = [
       statsService.logDeepLUsage(
-        question._id as mongoose.Types.ObjectId,
+        questionId,
         translatedQuestion.billedCharacters,
         firstLocale.language,
         language,
         firstLocale.question,
       ),
       ...translatedAnswers.map((answer) =>
-        statsService.logDeepLUsage(
-          question._id as mongoose.Types.ObjectId,
-          answer.billedCharacters,
-          firstLocale.language,
-          language,
-          answer.text,
-        ),
+        statsService.logDeepLUsage(questionId, answer.billedCharacters, firstLocale.language, language, answer.text),
       ),
-    ]);
+    ];
+
+    await Promise.all(logDeepLUsagePromises);
 
     return ServiceResponse.success<translatedQuestionResponse>("Question translated", {
       question: translatedQuestion.text,
@@ -341,6 +314,27 @@ export class QuestionService {
         translatedQuestion.billedCharacters +
         translatedAnswers.reduce((acc, answer) => acc + answer.billedCharacters, 0),
     });
+  }
+
+  async translateQuestion(
+    questionId: string,
+    language: TargetLanguageCode,
+  ): Promise<ServiceResponse<translatedQuestionResponse | null>> {
+    return this.translateQuestionBase(() => QuestionModel.findById(questionId).lean(), questionId, language);
+  }
+
+  async translateGeneratedQuestion(
+    questionId: string,
+    language: TargetLanguageCode,
+  ): Promise<ServiceResponse<translatedQuestionResponse | null>> {
+    return this.translateQuestionBase(
+      async () => {
+        const question = await redisClient.get(`question:${questionId}`);
+        return question ? JSON.parse(question) : null;
+      },
+      questionId,
+      language,
+    );
   }
 
   async updateQuestionValidationStatus(
@@ -411,7 +405,7 @@ export class QuestionService {
     return this.updateLocaleStatus(questionId, language, false);
   }
 
-  async updateQuestionStatus(questionId: string, status: Status) {
+  async updateQuestionStatus(questionId: string, status: QuestionStatus) {
     const question = await QuestionModel.findByIdAndUpdate(questionId, { status }, { new: true });
 
     if (!question) {
@@ -485,6 +479,18 @@ export class QuestionService {
     }
 
     return ServiceResponse.success<IQuestion>("Question updated", updatedQuestion);
+  }
+
+  async updateGeneratedQuestion(questionId: string, question: IQuestion) {
+    const updatedQuestion = await redisClient.set(`question:${questionId}`, JSON.stringify(question), {
+      EX: 86400,
+    });
+
+    if (!updatedQuestion) {
+      return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
+    }
+
+    return ServiceResponse.success<IQuestion>("Question updated", question);
   }
 }
 

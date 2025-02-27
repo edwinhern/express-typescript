@@ -70,7 +70,7 @@ export class StatsService {
 
   //#region DeepL Usage Logs
   async logDeepLUsage(
-    questionId: mongoose.Types.ObjectId,
+    questionId: mongoose.Types.ObjectId | string,
     charactersUsed: number,
     sourceLanguage: string,
     targetLanguage: string,

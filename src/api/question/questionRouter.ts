@@ -190,6 +190,32 @@ questionRouter.get(
 
 questionRegistry.registerPath({
   method: "get",
+  path: "/questions/generated/{id}",
+  tags: ["Questions"],
+  request: {
+    params: z.object({
+      id: z.string().min(1, { message: "Question ID is required" }),
+    }),
+  },
+  responses: createApiResponse(QuestionSchema, "Success"),
+  security: [{ BearerAuth: [] }],
+});
+
+questionRouter.get(
+  "/generated/:id",
+  accessTokenGuard,
+  validateRequest(
+    z.object({
+      params: z.object({
+        id: z.string().min(1, { message: "Question ID is required" }),
+      }),
+    }),
+  ),
+  questionController.getGeneratedQuestion,
+);
+
+questionRegistry.registerPath({
+  method: "get",
   path: "/questions/{id}",
   tags: ["Questions"],
   request: {
@@ -281,37 +307,6 @@ questionRouter.put(
   questionController.updateQuestion,
 );
 
-// questionRegistry.registerPath({
-//   method: "get",
-//   path: "/questions/{category}/by-category",
-//   tags: ["Questions"],
-//   request: {
-//     params: z.object({
-//       category: z.string().min(1, { message: "Category is required" }),
-//     }),
-//   },
-//   responses: createApiResponse(z.array(QuestionSchema), "Success"),
-//   security: [{ BearerAuth: [] }],
-// });
-
-// questionRouter.get("/:category/by-category", accessTokenGuard, questionController.getQuestionsByCategory);
-
-// questionRegistry.registerPath({
-//   method: "patch",
-//   path: "/questions/{id}/approve",
-//   tags: ["Questions"],
-//   description: "Approve a question (set field 'valid' to true)",
-//   request: {
-//     params: z.object({
-//       id: z.string().min(1, { message: "Question ID is required" }),
-//     }),
-//   },
-//   responses: createApiResponse(QuestionSchema, "Success"),
-//   security: [{ BearerAuth: [] }],
-// });
-
-// questionRouter.patch("/:id/approve", accessTokenGuard, questionController.approveQuestion);
-
 questionRegistry.registerPath({
   method: "delete",
   path: "/questions/{id}/reject",
@@ -327,50 +322,6 @@ questionRegistry.registerPath({
 });
 
 questionRouter.delete("/:id/reject", accessTokenGuard, questionController.rejectQuestion);
-
-// questionRegistry.registerPath({
-//   method: "patch",
-//   path: "/questions/{id}/translate/{language}/approve",
-//   tags: ["Questions"],
-//   description: "Approve a question translation (set field 'valid' in the locale to true)",
-//   request: {
-//     params: z.object({
-//       id: z.string().min(1, { message: "Question ID is required" }),
-//       language: z
-//         .string()
-//         .min(2, { message: "Language code is required" })
-//         .max(2, { message: "Language code must be 2 characters" }),
-//     }),
-//   },
-//   responses: createApiResponse(QuestionSchema, "Success"),
-//   security: [{ BearerAuth: [] }],
-// });
-
-// questionRouter.patch(
-//   "/:id/translate/:language/approve",
-//   accessTokenGuard,
-//   questionController.approveQuestionTranslation,
-// );
-
-// questionRegistry.registerPath({
-//   method: "patch",
-//   path: "/questions/{id}/translate/{language}/reject",
-//   tags: ["Questions"],
-//   description: "Reject a question translation (set field 'valid' in the locale to false)",
-//   request: {
-//     params: z.object({
-//       id: z.string().min(1, { message: "Question ID is required" }),
-//       language: z
-//         .string()
-//         .min(2, { message: "Language code is required" })
-//         .max(2, { message: "Language code must be 2 characters" }),
-//     }),
-//   },
-//   responses: createApiResponse(QuestionSchema, "Success"),
-//   security: [{ BearerAuth: [] }],
-// });
-
-// questionRouter.patch("/:id/translate/:language/reject", accessTokenGuard, questionController.rejectQuestionTranslation);
 
 questionRegistry.registerPath({
   method: "post",
@@ -471,29 +422,81 @@ questionRouter.post(
   questionController.translateQuestion,
 );
 
-// questionRegistry.registerPath({
-//   method: "patch",
-//   path: "/questions/{id}/status",
-//   tags: ["Questions"],
-//   request: {
-//     params: z.object({
-//       id: z.string().min(1, { message: "Question ID is required" }),
-//     }),
-//     body: {
-//       content: {
-//         "application/json": {
-//           schema: z.object({
-//             status: z.enum(["proof_reading", "approved", "rejected", "pending"]),
-//           }),
-//         },
-//       },
-//     },
-//   },
-//   responses: createApiResponse(QuestionSchema, "Success"),
-//   security: [{ BearerAuth: [] }],
-// });
+questionRegistry.registerPath({
+  method: "post",
+  path: "/questions/generated/translate/{questionId}",
+  tags: ["Questions"],
+  request: {
+    params: z.object({
+      questionId: z.string().min(1, { message: "Question ID is required" }),
+    }),
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            language: z.string().min(2, { message: "Language code is required" }),
+          }),
+          examples: {
+            Deutsch: {
+              value: {
+                language: "de",
+              },
+              description: "Translate to German",
+            },
+            Français: {
+              value: {
+                language: "fr",
+              },
+              description: "Translate to French",
+            },
+            Español: {
+              value: {
+                language: "es",
+              },
+              description: "Translate to Spanish",
+            },
+            Ukrainian: {
+              value: {
+                language: "uk",
+              },
+              description: "Translate to Ukrainian",
+            },
+          },
+        },
+      },
+    },
+  },
+  responses: createApiResponse(
+    z.object({
+      language: z.string(),
+      question: z.string(),
+      correct: z.string(),
+      wrong: z.array(z.string()),
+      isValid: z.boolean(),
+    }),
+    "Success",
+  ),
+  security: [{ BearerAuth: [] }],
+});
 
-// questionRouter.patch("/:id/status", accessTokenGuard, questionController.updateQuestionStatus);
+questionRouter.post(
+  "/generated/translate/:questionId",
+  accessTokenGuard,
+  validateRequest(
+    z.object({
+      body: z.object({
+        language: z
+          .string()
+          .min(2, { message: "Language code is required" })
+          .max(2, { message: "Language code must be 2 characters" }),
+      }),
+      params: z.object({
+        questionId: z.string(),
+      }),
+    }),
+  ),
+  questionController.translateGeneratedQuestion,
+);
 
 questionRegistry.registerPath({
   method: "delete",

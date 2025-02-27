@@ -1,7 +1,7 @@
 import mongoose, { Schema, type Document } from "mongoose";
 import type { ICategory } from "./category.model";
 
-export type Status = "proof_reading" | "approved" | "rejected" | "pending";
+export type QuestionStatus = "proof_reading" | "approved" | "rejected" | "pending";
 
 export interface ILocaleSchema {
   language: string;
@@ -19,7 +19,7 @@ export enum QuestionType {
 
 export interface IQuestion extends Document {
   categoryId: mongoose.Types.ObjectId | ICategory;
-  status: Status;
+  status: QuestionStatus;
   track?: string;
   type: QuestionType;
   difficulty: number; // 1-5
@@ -30,6 +30,8 @@ export interface IQuestion extends Document {
   tags: string[];
   locales: ILocaleSchema[];
   isValid: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const LocaleSchema = new Schema<ILocaleSchema>({
