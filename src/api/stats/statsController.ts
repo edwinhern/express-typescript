@@ -1,6 +1,7 @@
 import type { ServiceResponse } from "@/common/models/serviceResponse";
 import { handleServiceResponse } from "@/common/utils/httpHandlers";
 import type { Request, RequestHandler, Response } from "express";
+import { GetDeepLUsageLogsDto } from "./dto/get-deepl-usage-logs.dto";
 import type { IQuestionGenerationLog } from "./models/questionGenerationLog.model";
 import { statsService } from "./statsService";
 
@@ -34,17 +35,7 @@ export class StatsController {
   };
 
   getDeepLUsageLogs: RequestHandler = async (req: Request, res: Response) => {
-    const { from, to, minTokens, maxTokens } = req.query;
-    const dateRange = {
-      from: from ? new Date(from as string) : undefined,
-      to: to ? new Date(to as string) : undefined,
-    };
-
-    const serviceResponse: ServiceResponse<any> = await statsService.getDeepLUsageLogs(
-      dateRange,
-      minTokens ? Number.parseInt(minTokens as string) : undefined,
-      maxTokens ? Number.parseInt(maxTokens as string) : undefined,
-    );
+    const serviceResponse: ServiceResponse<any> = await statsService.getDeepLUsageLogs(req.query as any);
 
     handleServiceResponse(serviceResponse, res);
   };

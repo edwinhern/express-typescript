@@ -1,5 +1,6 @@
 import { ServiceResponse } from "@/common/models/serviceResponse";
 import type mongoose from "mongoose";
+import type { GetDeepLUsageLogsDto } from "./dto/get-deepl-usage-logs.dto";
 import { DeepLUsageLogModel, type IDeepLUsageLog } from "./models/deeplUsageLog.model";
 import { type IQuestionGenerationLog, QuestionGenerationLogModel } from "./models/questionGenerationLog.model";
 export class StatsService {
@@ -85,12 +86,67 @@ export class StatsService {
     });
   }
 
+  // async getDeepLUsageLogs(
+  //   // dateRange?: { from?: Date; to?: Date },
+  //   // minCharacters?: number,
+  //   // maxCharacters?: number,
+  //   getDeepLUsageLogsDto: GetDeepLUsageLogsDto,
+  // ): Promise<
+  //   ServiceResponse<{
+  //     logs: IDeepLUsageLog[];
+  //     totalCharacters: number;
+  //     totalRequests: number;
+  //   }>
+  // > {
+  //   const { dateRange, minCharacters, maxCharacters, page, limit } = getDeepLUsageLogsDto;
+  //   const query: any = {};
+
+  //   if (dateRange?.from || dateRange?.to) {
+  //     query.createdAt = {};
+  //     if (dateRange.from) query.createdAt.$gte = dateRange.from;
+  //     if (dateRange.to) query.createdAt.$lte = dateRange.to;
+  //   }
+
+  //   if (minCharacters !== undefined) {
+  //     query.charactersUsed = { ...query.charactersUsed, $gte: minCharacters };
+  //   }
+
+  //   if (maxCharacters !== undefined) {
+  //     query.charactersUsed = { ...query.charactersUsed, $lte: maxCharacters };
+  //   }
+
+  //   const logs = await DeepLUsageLogModel.find(query).sort({ createdAt: -1 });
+  //   const totalCharacters = await DeepLUsageLogModel.aggregate([
+  //     {
+  //       $group: {
+  //         _id: null,
+  //         totalCharacters: { $sum: "$charactersUsed" },
+  //         totalRequests: { $sum: 1 },
+  //       },
+  //     },
+  //   ]);
+
+  //   const totalRequests = totalCharacters.length > 0 ? totalCharacters[0].totalRequests : 0;
+  //   const totalCharactersUsed = totalCharacters.length > 0 ? totalCharacters[0].totalCharacters : 0;
+
+  //   return ServiceResponse.success("Logs found", {
+  //     logs,
+  //     totalCharacters: totalCharactersUsed,
+  //     totalRequests,
+  //   });
+  // }
+
   async getDeepLUsageLogs(
-    dateRange?: { from?: Date; to?: Date },
-    minCharacters?: number,
-    maxCharacters?: number,
-  ): Promise<ServiceResponse<IDeepLUsageLog[]>> {
+    getDeepLUsageLogsDto: GetDeepLUsageLogsDto,
+  ): Promise<
+    ServiceResponse<{ logs: IDeepLUsageLog[]; totalCharacters: number; totalRequests: number; totalPages: number }>
+  > {
+    const { dateRange, minCharacters, maxCharacters, page, limit } = getDeepLUsageLogsDto;
     const query: any = {};
+
+    // Проверяем корректность входных параметров
+    const validLimit = !limit || limit <= 0 || Number.isNaN(Number(limit)) ? 10 : limit;
+    const validPage = !page || page <= 0 || Number.isNaN(Number(page)) ? 1 : page;
 
     if (dateRange?.from || dateRange?.to) {
       query.createdAt = {};
@@ -106,9 +162,29 @@ export class StatsService {
       query.charactersUsed = { ...query.charactersUsed, $lte: maxCharacters };
     }
 
-    const logs = await DeepLUsageLogModel.find(query).sort({ createdAt: -1 });
+    const logs = await DeepLUsageLogModel.find(query)
+      .sort({ createdAt: -1 })
+      .skip((validPage - 1) * validLimit)
+      .limit(validLimit);
+    const totalCharacters = await DeepLUsageLogModel.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalCharacters: { $sum: "$charactersUsed" },
+          totalRequests: { $sum: 1 },
+        },
+      },
+    ]);
 
-    return ServiceResponse.success("Logs found", logs);
+    const totalRequests = totalCharacters.length > 0 ? totalCharacters[0].totalRequests : 0;
+    const totalCharactersUsed = totalCharacters.length > 0 ? totalCharacters[0].totalCharacters : 0;
+
+    return ServiceResponse.success("Logs found", {
+      logs,
+      totalCharacters: totalCharactersUsed,
+      totalRequests,
+      totalPages: Math.ceil(totalRequests / validLimit),
+    });
   }
 
   async getDeepLUsageStats(): Promise<ServiceResponse<{ totalCharacters: number; totalRequests: number }>> {
