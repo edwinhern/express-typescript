@@ -45,6 +45,7 @@ export class QuestionService {
         type: type ? { $eq: type } : { $exists: true },
         status: status ? { $eq: status } : { $exists: true },
       })
+        .sort({ createdAt: -1 }) // Сортировка по createdAt (новые сначала)
         .limit(validLimit)
         .skip((validPage - 1) * validLimit)
         .lean(),
@@ -445,28 +446,50 @@ export class QuestionService {
     return ServiceResponse.success<IQuestion>("Question translation deleted", question);
   }
 
-  async confirmQuestion(sessionId: string, questionId: string) {
-    const session = await redisClient.get(`session:${sessionId}`);
-    const sessionData = JSON.parse(session!);
+  // async confirmQuestion(sessionId: string, questionId: string) {
+  //   const session = await redisClient.get(`session:${sessionId}`);
+  //   const sessionData = JSON.parse(session!);
 
-    const questionIndex = sessionData.questions.findIndex((question: any) => question.id === questionId);
+  //   const questionIndex = sessionData.questions.findIndex((question: any) => question.id === questionId);
 
-    if (questionIndex === -1) {
+  //   if (questionIndex === -1) {
+  //     return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
+  //   }
+
+  //   const question = sessionData.questions[questionIndex];
+
+  //   const categoryModel = await this.findOrCreateCategory(question.categoryId);
+  //   const categoryModelId = categoryModel._id as mongoose.Types.ObjectId;
+
+  //   const savedQuestion = await QuestionModel.create({
+  //     ...question,
+  //     categoryId: categoryModelId,
+  //   });
+
+  //   sessionData.questions.splice(questionIndex, 1);
+  //   await redisClient.set(`session:${sessionId}`, JSON.stringify(sessionData), { EX: 86400 });
+
+  //   return ServiceResponse.success<IQuestion>("Question confirmed", savedQuestion);
+  // }
+
+  async confirmQuestion(questionId: string) {
+    const question = await redisClient.get(`question:${questionId}`);
+
+    if (!question) {
       return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
     }
 
-    const question = sessionData.questions[questionIndex];
+    const parsedQuestion = JSON.parse(question);
 
-    const categoryModel = await this.findOrCreateCategory(question.categoryId);
+    const categoryModel = await this.findOrCreateCategory(parsedQuestion.categoryId);
     const categoryModelId = categoryModel._id as mongoose.Types.ObjectId;
 
     const savedQuestion = await QuestionModel.create({
-      ...question,
+      ...parsedQuestion,
       categoryId: categoryModelId,
     });
 
-    sessionData.questions.splice(questionIndex, 1);
-    await redisClient.set(`session:${sessionId}`, JSON.stringify(sessionData), { EX: 86400 });
+    await redisClient.del(`question:${questionId}`);
 
     return ServiceResponse.success<IQuestion>("Question confirmed", savedQuestion);
   }

@@ -125,9 +125,9 @@ export class QuestionController {
 
   confirmQuestion: RequestHandler = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { sessionId } = req.user!;
+    // const { sessionId } = req.user!;
 
-    const serviceResponse = await questionService.confirmQuestion(sessionId, id);
+    const serviceResponse = await questionService.confirmQuestion(id);
 
     handleServiceResponse(serviceResponse, res);
   };
