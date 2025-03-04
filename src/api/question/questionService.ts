@@ -351,69 +351,47 @@ export class QuestionService {
     return ServiceResponse.success<IQuestion>(isValid ? "Question approved" : "Question rejected", question);
   }
 
-  async updateLocaleStatus(
-    questionId: string,
-    language: string,
-    isValid: boolean,
-  ): Promise<ServiceResponse<IQuestion | null>> {
-    const question = await QuestionModel.findById(questionId);
-
-    if (!question) {
-      return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
-    }
-
-    const locale = question.locales.find((l) => l.language === language);
-
-    if (!locale) {
-      return ServiceResponse.failure("Locale not found", null, StatusCodes.NOT_FOUND);
-    }
-
-    locale.isValid = isValid;
-    await question.save();
-
-    return ServiceResponse.success<IQuestion>(
-      isValid ? "Question translation confirmed" : "Question translation rejected",
-      question,
-    );
-  }
-
   async approveQuestion(questionId: string) {
     return this.updateQuestionValidationStatus(questionId, true);
   }
 
-  async rejectQuestion(questionId: string, squestionId: string) {
-    const session = await redisClient.get(`session:${squestionId}`);
-    const sessionData = JSON.parse(session!);
+  async rejectQuestions(questionIds: string[]) {
+    try {
+      const redisKeys = questionIds.map((id) => `question:${id}`);
+      const questionsData = await redisClient.mGet(redisKeys); // Получаем все вопросы одним запросом
 
-    const questionIndex = sessionData.questions.findIndex((question: any) => question.id === questionId);
+      // Фильтруем отсутствующие вопросы и парсим JSON
+      const validQuestions = questionsData
+        .map((data, index) => (data ? { id: questionIds[index], ...JSON.parse(data) } : null))
+        .filter((q) => q !== null) as Array<{ id: string }>;
 
-    if (questionIndex === -1) {
-      return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
+      if (validQuestions.length === 0) {
+        return ServiceResponse.failure("No valid questions found", null, StatusCodes.NOT_FOUND);
+      }
+
+      // Удаляем отклоненные вопросы из Redis
+      await redisClient.del(redisKeys);
+
+      return ServiceResponse.success<IQuestion[]>(
+        "Questions rejected",
+        validQuestions.map((q) => q as IQuestion),
+      );
+    } catch (error) {
+      console.error("Error rejecting questions:", error);
+      return ServiceResponse.failure("Internal Server Error", null, StatusCodes.INTERNAL_SERVER_ERROR);
     }
-
-    sessionData.questions.splice(questionIndex, 1);
-
-    await redisClient.set(`session:${squestionId}`, JSON.stringify(sessionData), { EX: 86400 });
-
-    return ServiceResponse.success<null>("Question rejected", null);
   }
 
-  async approveQuestionTranslation(questionId: string, language: string) {
-    return this.updateLocaleStatus(questionId, language, true);
-  }
-
-  async rejectQuestionTranslation(questionId: string, language: string) {
-    return this.updateLocaleStatus(questionId, language, false);
-  }
-
-  async updateQuestionStatus(questionId: string, status: QuestionStatus) {
-    const question = await QuestionModel.findByIdAndUpdate(questionId, { status }, { new: true });
-
-    if (!question) {
-      return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
+  async rejectQuestion(questionId: string) {
+    try {
+      const result = await this.rejectQuestions([questionId]);
+      return result.success
+        ? ServiceResponse.success<IQuestion>("Question rejected", result.responseObject![0])
+        : ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
+    } catch (error) {
+      console.error("Error rejecting question:", error);
+      return ServiceResponse.failure("Internal Server Error", null, StatusCodes.INTERNAL_SERVER_ERROR);
     }
-
-    return ServiceResponse.success<IQuestion>("Question status updated", question);
   }
 
   async deleteQuestion(questionId: string) {
@@ -446,52 +424,60 @@ export class QuestionService {
     return ServiceResponse.success<IQuestion>("Question translation deleted", question);
   }
 
-  // async confirmQuestion(sessionId: string, questionId: string) {
-  //   const session = await redisClient.get(`session:${sessionId}`);
-  //   const sessionData = JSON.parse(session!);
+  async confirmQuestions(questionIds: string[]) {
+    try {
+      const redisKeys = questionIds.map((id) => `question:${id}`);
+      const questionsData = await redisClient.mGet(redisKeys); // Получаем все вопросы одним запросом
 
-  //   const questionIndex = sessionData.questions.findIndex((question: any) => question.id === questionId);
+      // Фильтруем отсутствующие вопросы и парсим JSON
+      const validQuestions = questionsData
+        .map((data, index) => (data ? { id: questionIds[index], ...JSON.parse(data) } : null))
+        .filter((q) => q !== null) as Array<{ id: string; categoryId: string }>;
 
-  //   if (questionIndex === -1) {
-  //     return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
-  //   }
+      if (validQuestions.length === 0) {
+        return ServiceResponse.failure("No valid questions found", null, StatusCodes.NOT_FOUND);
+      }
 
-  //   const question = sessionData.questions[questionIndex];
+      // Обрабатываем категории
+      const categoryMap = new Map<string, mongoose.Types.ObjectId>();
+      for (const question of validQuestions) {
+        if (!categoryMap.has(question.categoryId)) {
+          const categoryModel = await this.findOrCreateCategory(question.categoryId);
+          categoryMap.set(question.categoryId, categoryModel._id as mongoose.Types.ObjectId);
+        }
+      }
 
-  //   const categoryModel = await this.findOrCreateCategory(question.categoryId);
-  //   const categoryModelId = categoryModel._id as mongoose.Types.ObjectId;
+      // Создаем вопросы в базе данных
+      const savedQuestions = await QuestionModel.insertMany(
+        validQuestions.map((q) => ({
+          ...q,
+          categoryId: categoryMap.get(q.categoryId),
+        })),
+      );
 
-  //   const savedQuestion = await QuestionModel.create({
-  //     ...question,
-  //     categoryId: categoryModelId,
-  //   });
+      // Удаляем подтвержденные вопросы из Redis
+      await redisClient.del(redisKeys);
 
-  //   sessionData.questions.splice(questionIndex, 1);
-  //   await redisClient.set(`session:${sessionId}`, JSON.stringify(sessionData), { EX: 86400 });
-
-  //   return ServiceResponse.success<IQuestion>("Question confirmed", savedQuestion);
-  // }
+      return ServiceResponse.success<IQuestion[]>(
+        "Questions confirmed",
+        savedQuestions.map((q) => q.toObject()),
+      );
+    } catch (error) {
+      console.error("Error confirming questions:", error);
+      return ServiceResponse.failure("Internal Server Error", null, StatusCodes.INTERNAL_SERVER_ERROR);
+    }
+  }
 
   async confirmQuestion(questionId: string) {
-    const question = await redisClient.get(`question:${questionId}`);
-
-    if (!question) {
-      return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
+    try {
+      const result = await this.confirmQuestions([questionId]);
+      return result.success
+        ? ServiceResponse.success<IQuestion>("Question confirmed", result.responseObject![0])
+        : ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
+    } catch (error) {
+      console.error("Error confirming question:", error);
+      return ServiceResponse.failure("Internal Server Error", null, StatusCodes.INTERNAL_SERVER_ERROR);
     }
-
-    const parsedQuestion = JSON.parse(question);
-
-    const categoryModel = await this.findOrCreateCategory(parsedQuestion.categoryId);
-    const categoryModelId = categoryModel._id as mongoose.Types.ObjectId;
-
-    const savedQuestion = await QuestionModel.create({
-      ...parsedQuestion,
-      categoryId: categoryModelId,
-    });
-
-    await redisClient.del(`question:${questionId}`);
-
-    return ServiceResponse.success<IQuestion>("Question confirmed", savedQuestion);
   }
 
   async updateQuestion(questionId: string, question: IQuestion) {

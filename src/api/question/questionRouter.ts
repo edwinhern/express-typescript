@@ -308,6 +308,72 @@ questionRouter.put(
 );
 
 questionRegistry.registerPath({
+  method: "post",
+  path: "/questions/confirm",
+  tags: ["Questions"],
+  description: "Save the questions to the database (by default the questions saved in the Redis cache only)",
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            ids: z.array(z.string()),
+          }),
+        },
+      },
+    },
+  },
+  responses: createApiResponse(z.array(QuestionSchema), "Success"),
+  security: [{ BearerAuth: [] }],
+});
+
+questionRouter.post(
+  "/confirm",
+  accessTokenGuard,
+  validateRequest(
+    z.object({
+      body: z.object({
+        ids: z.array(z.string()),
+      }),
+    }),
+  ),
+  questionController.confirmQuestions,
+);
+
+questionRegistry.registerPath({
+  method: "delete",
+  path: "/questions/reject",
+  tags: ["Questions"],
+  description: "Reject the questions",
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            ids: z.array(z.string()),
+          }),
+        },
+      },
+    },
+  },
+  responses: createApiResponse(z.array(QuestionSchema), "Success"),
+  security: [{ BearerAuth: [] }],
+});
+
+questionRouter.delete(
+  "/reject",
+  accessTokenGuard,
+  validateRequest(
+    z.object({
+      body: z.object({
+        ids: z.array(z.string()),
+      }),
+    }),
+  ),
+  questionController.rejectQuestions,
+);
+
+questionRegistry.registerPath({
   method: "delete",
   path: "/questions/{id}/reject",
   tags: ["Questions"],
@@ -513,21 +579,21 @@ questionRegistry.registerPath({
 
 questionRouter.delete("/:id", accessTokenGuard, questionController.deleteQuestion);
 
-questionRegistry.registerPath({
-  method: "delete",
-  path: "/questions/{id}/translate/{language}",
-  tags: ["Questions"],
-  request: {
-    params: z.object({
-      id: z.string().min(1, { message: "Question ID is required" }),
-      language: z
-        .string()
-        .min(2, { message: "Language code is required" })
-        .max(2, { message: "Language code must be 2 characters" }),
-    }),
-  },
-  responses: createApiResponse(QuestionSchema, "Success"),
-  security: [{ BearerAuth: [] }],
-});
+// questionRegistry.registerPath({
+//   method: "delete",
+//   path: "/questions/{id}/translate/{language}",
+//   tags: ["Questions"],
+//   request: {
+//     params: z.object({
+//       id: z.string().min(1, { message: "Question ID is required" }),
+//       language: z
+//         .string()
+//         .min(2, { message: "Language code is required" })
+//         .max(2, { message: "Language code must be 2 characters" }),
+//     }),
+//   },
+//   responses: createApiResponse(QuestionSchema, "Success"),
+//   security: [{ BearerAuth: [] }],
+// });
 
-questionRouter.delete("/:id/translate/:language", accessTokenGuard, questionController.deleteQuestionTranslation);
+// questionRouter.delete("/:id/translate/:language", accessTokenGuard, questionController.deleteQuestionTranslation);

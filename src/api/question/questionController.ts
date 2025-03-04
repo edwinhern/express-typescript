@@ -46,24 +46,16 @@ export class QuestionController {
 
   rejectQuestion: RequestHandler = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { sessionId } = req.user!;
-    const serviceResponse: ServiceResponse<IQuestion | null> = await questionService.rejectQuestion(id, sessionId);
+    // const { sessionId } = req.user!;
+    const serviceResponse: ServiceResponse<IQuestion | null> = await questionService.rejectQuestion(id);
 
     handleServiceResponse(serviceResponse, res);
   };
 
-  approveQuestionTranslation: RequestHandler = async (req: Request, res: Response) => {
-    const { id, language } = req.params;
-
-    const serviceResponse = await questionService.approveQuestionTranslation(id, language);
-
-    handleServiceResponse(serviceResponse, res);
-  };
-
-  rejectQuestionTranslation: RequestHandler = async (req: Request, res: Response) => {
-    const { id, language } = req.params;
-
-    const serviceResponse = await questionService.rejectQuestionTranslation(id, language);
+  rejectQuestions: RequestHandler = async (req: Request, res: Response) => {
+    const { ids } = req.body;
+    // const { sessionId } = req.user!;
+    const serviceResponse = await questionService.rejectQuestions(ids);
 
     handleServiceResponse(serviceResponse, res);
   };
@@ -98,15 +90,6 @@ export class QuestionController {
     handleServiceResponse(serviceResponse, res);
   };
 
-  updateQuestionStatus: RequestHandler = async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    const serviceResponse = await questionService.updateQuestionStatus(id, status);
-
-    handleServiceResponse(serviceResponse, res);
-  };
-
   deleteQuestion: RequestHandler = async (req: Request, res: Response) => {
     const { id } = req.params;
 
@@ -128,6 +111,14 @@ export class QuestionController {
     // const { sessionId } = req.user!;
 
     const serviceResponse = await questionService.confirmQuestion(id);
+
+    handleServiceResponse(serviceResponse, res);
+  };
+
+  confirmQuestions: RequestHandler = async (req: Request, res: Response) => {
+    const { ids } = req.body;
+    // const { sessionId } = req.user!;
+    const serviceResponse = await questionService.confirmQuestions(ids);
 
     handleServiceResponse(serviceResponse, res);
   };
