@@ -2,7 +2,7 @@ import type { QuestionType } from "../models/question.model";
 
 export interface GenerateQuestionsDto {
   readonly prompt: string;
-  readonly max_tokens: number;
+  // readonly max_tokens: number;
   readonly count: number;
   readonly category: string;
   readonly type: QuestionType;

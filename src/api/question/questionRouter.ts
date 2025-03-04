@@ -41,7 +41,7 @@ questionRegistry.registerPath({
             max_tokens: z.number().optional(),
             count: z.number(),
             category: z.string(),
-            difficulty: z.number().min(1).max(5).optional(),
+            // difficulty: z.number().min(1).max(5).optional(),
             temperature: z.number().min(0).max(2).optional(),
             type: z.enum(["multiple_choice", "one_choice"]).optional(),
             model: z.string().default("gpt-3.5-turbo").optional(),
@@ -60,7 +60,7 @@ questionRegistry.registerPath({
             "One Choice (English with GPT-3.5 Turbo)": {
               value: {
                 prompt: "Some history of the United States",
-                max_tokens: 500,
+                // max_tokens: 500,
                 count: 5,
                 model: "gpt-3.5-turbo",
                 category: "history",
@@ -75,7 +75,7 @@ questionRegistry.registerPath({
             "One Choice (English with GPT-4o)": {
               value: {
                 prompt: "Some history of the United States",
-                max_tokens: 500,
+                // max_tokens: 500,
                 count: 5,
                 model: "gpt-4o",
                 category: "history",
@@ -90,7 +90,7 @@ questionRegistry.registerPath({
             "Multiple Choice (English with GPT-3.5 Turbo)": {
               value: {
                 prompt: "Some history of the United States",
-                max_tokens: 500,
+                // max_tokens: 500,
                 count: 5,
                 model: "gpt-3.5-turbo",
                 category: "history",
@@ -105,7 +105,7 @@ questionRegistry.registerPath({
             "Multiple Choice (English with GPT-4o)": {
               value: {
                 prompt: "Some history of the United States",
-                max_tokens: 500,
+                // max_tokens: 500,
                 count: 5,
                 model: "gpt-4o",
                 category: "history",
@@ -131,7 +131,7 @@ questionRouter.post(
     z.object({
       body: z.object({
         prompt: z.string(),
-        max_tokens: z.number().optional(),
+        // max_tokens: z.number().optional(),
         count: z.number(),
         category: z.string(),
         difficulty: z.number().min(1).max(5).optional(),

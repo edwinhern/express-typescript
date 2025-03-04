@@ -122,7 +122,7 @@ export class OpenAiService {
     try {
       const {
         prompt,
-        max_tokens: maxTokens,
+        // max_tokens: maxTokens,
         count,
         category,
         type: questionType,
@@ -181,7 +181,7 @@ export class OpenAiService {
           },
         ],
         function_call: { name: "create_questions" },
-        max_tokens: maxTokens,
+        // max_tokens: maxTokens,
       });
 
       logger.info(`OpenAI API Response: ${JSON.stringify(response, null, 2)}`);
