@@ -125,22 +125,20 @@ export class OpenAiService {
         // max_tokens: maxTokens,
         count,
         category,
-        type: questionType,
-        difficulty,
+        temperature,
+        model,
         requiredLanguages: [locale],
       } = generateQuestionsDto;
 
       const response = await this.openAi.chat.completions.create({
-        model: "gpt-4-turbo",
+        model,
         messages: [
           {
             role: "user",
-            content: `Generate ${count} ${questionType.replace("_", " ")} questions using the prompt: "${prompt}". 
-                      Each question must be in the "${category}" category, have a difficulty level of ${difficulty}, 
-                      and be in the "${locale}" language.
-                      
-                      Additionally, provide a list of reliable sources (like Wikipedia, Britannica, or government websites) 
-                      for fact-checking each question. If possible, include direct links.`,
+            content: `Generate ${count} questions based on the prompt: "${prompt}".  
+                      Each question must belong to the "${category}" category and be in "${locale}".  
+
+                      Include reliable sources (e.g., Wikipedia, Britannica, government sites) for fact-checking, preferably with direct links.`,
           },
         ],
         functions: [
@@ -158,7 +156,7 @@ export class OpenAiService {
                       language: { type: "string", description: "Question language (e.g., en, de, pl)" },
                       question: { type: "string", description: "The question text" },
                       correct: {
-                        type: questionType === QuestionType.TrueFalse ? "boolean" : "string",
+                        type: "string",
                         description: "The correct answer(s)",
                       },
                       wrong: {
@@ -182,6 +180,7 @@ export class OpenAiService {
         ],
         function_call: { name: "create_questions" },
         // max_tokens: maxTokens,
+        temperature,
       });
 
       logger.info(`OpenAI API Response: ${JSON.stringify(response, null, 2)}`);
@@ -201,8 +200,8 @@ export class OpenAiService {
           id: uuidv4(),
           categoryId: category,
           status: "pending",
-          type: questionType,
-          difficulty,
+          type: QuestionType.OneChoice,
+          difficulty: 3,
           requiredLanguages: [locale],
           tags: [],
           locales: [
