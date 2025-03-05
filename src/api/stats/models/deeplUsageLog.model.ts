@@ -6,6 +6,7 @@ export interface IDeepLUsageLog extends Document {
   sourceLanguage: string;
   targetLanguage: string;
   requestText: string;
+  translatedText: string;
   createdAt: Date;
 }
 
@@ -16,6 +17,7 @@ const DeepLUsageLogSchema = new Schema<IDeepLUsageLog>(
     sourceLanguage: { type: String, required: true },
     targetLanguage: { type: String, required: true },
     requestText: { type: String, required: true },
+    translatedText: { type: String },
   },
   { timestamps: true },
 );

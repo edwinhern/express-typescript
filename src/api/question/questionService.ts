@@ -3,7 +3,7 @@ import { ServiceResponse } from "@/common/models/serviceResponse";
 import { redisClient } from "@/common/utils/redisClient";
 import { logger } from "@/server";
 import * as deepl from "deepl-node";
-import type { TargetLanguageCode, Translator } from "deepl-node";
+import type { SourceLanguageCode, TargetLanguageCode, Translator } from "deepl-node";
 import { StatusCodes } from "http-status-codes";
 import type mongoose from "mongoose";
 import { openaiService } from "../openai/openaiService";
@@ -265,6 +265,7 @@ export class QuestionService {
       );
     }
   }
+
   async translateQuestionBase(
     getQuestion: () => Promise<any>,
     questionId: string,
@@ -277,31 +278,55 @@ export class QuestionService {
     }
 
     const firstLocale: ILocaleSchema = question.locales[0];
+    const sourceLanguage = firstLocale.language;
 
-    const [translatedQuestion, ...translatedAnswers] = await Promise.all([
-      this.deeplClient.translateText(firstLocale.question, null, language),
-      ...firstLocale.wrong.map((answer) => this.deeplClient.translateText(answer, null, language)),
-      this.deeplClient.translateText(firstLocale.correct, null, language),
+    const translations = await Promise.all([
+      this.deeplClient.translateText(firstLocale.question, sourceLanguage as SourceLanguageCode, language),
+      ...firstLocale.wrong.map((answer) =>
+        this.deeplClient.translateText(answer, sourceLanguage as SourceLanguageCode, language),
+      ),
+      this.deeplClient.translateText(firstLocale.correct, sourceLanguage as SourceLanguageCode, language),
     ]);
+
+    const translatedQuestion = translations[0];
+    const translatedAnswers = translations.slice(1, -1);
+    const translatedCorrectAnswer = translations[translations.length - 1];
 
     const newLocale = {
       language,
       question: translatedQuestion.text,
-      correct: translatedAnswers.pop()!.text,
+      correct: translatedCorrectAnswer.text,
       wrong: translatedAnswers.map((answer) => answer.text),
       isValid: false,
     };
 
+    // Логирование использования DeepL
     const logDeepLUsagePromises = [
       statsService.logDeepLUsage(
         questionId,
         translatedQuestion.billedCharacters,
-        firstLocale.language,
+        sourceLanguage,
         language,
         firstLocale.question,
+        translatedQuestion.text,
       ),
-      ...translatedAnswers.map((answer) =>
-        statsService.logDeepLUsage(questionId, answer.billedCharacters, firstLocale.language, language, answer.text),
+      statsService.logDeepLUsage(
+        questionId,
+        translatedCorrectAnswer.billedCharacters,
+        sourceLanguage,
+        language,
+        firstLocale.correct,
+        translatedCorrectAnswer.text,
+      ),
+      ...translatedAnswers.map((answer, index) =>
+        statsService.logDeepLUsage(
+          questionId,
+          answer.billedCharacters,
+          sourceLanguage,
+          language,
+          firstLocale.wrong[index],
+          answer.text,
+        ),
       ),
     ];
 
@@ -311,9 +336,7 @@ export class QuestionService {
       question: translatedQuestion.text,
       correct: newLocale.correct,
       wrong: newLocale.wrong,
-      billedCharacters:
-        translatedQuestion.billedCharacters +
-        translatedAnswers.reduce((acc, answer) => acc + answer.billedCharacters, 0),
+      billedCharacters: translations.reduce((acc, trans) => acc + trans.billedCharacters, 0),
     });
   }
 

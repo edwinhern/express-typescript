@@ -76,6 +76,7 @@ export class StatsService {
     sourceLanguage: string,
     targetLanguage: string,
     requestText: string,
+    translatedText: string,
   ) {
     return await DeepLUsageLogModel.create({
       questionId,
@@ -83,6 +84,7 @@ export class StatsService {
       sourceLanguage,
       targetLanguage,
       requestText,
+      translatedText,
     });
   }
 
@@ -141,17 +143,18 @@ export class StatsService {
   ): Promise<
     ServiceResponse<{ logs: IDeepLUsageLog[]; totalCharacters: number; totalRequests: number; totalPages: number }>
   > {
-    const { dateRange, minCharacters, maxCharacters, page, limit } = getDeepLUsageLogsDto;
+    const { startDate, endDate, minCharacters, maxCharacters, page, limit, sourceLanguage, targetLanguage } =
+      getDeepLUsageLogsDto;
     const query: any = {};
 
     // Проверяем корректность входных параметров
     const validLimit = !limit || limit <= 0 || Number.isNaN(Number(limit)) ? 10 : limit;
     const validPage = !page || page <= 0 || Number.isNaN(Number(page)) ? 1 : page;
 
-    if (dateRange?.from || dateRange?.to) {
+    if (startDate || endDate) {
       query.createdAt = {};
-      if (dateRange.from) query.createdAt.$gte = dateRange.from;
-      if (dateRange.to) query.createdAt.$lte = dateRange.to;
+      if (startDate) query.createdAt.$gte = startDate;
+      if (endDate) query.createdAt.$lte = endDate;
     }
 
     if (minCharacters !== undefined) {
@@ -162,10 +165,19 @@ export class StatsService {
       query.charactersUsed = { ...query.charactersUsed, $lte: maxCharacters };
     }
 
+    if (sourceLanguage) {
+      query.sourceLanguage = sourceLanguage;
+    }
+
+    if (targetLanguage) {
+      query.targetLanguage = targetLanguage;
+    }
+
     const logs = await DeepLUsageLogModel.find(query)
-      .sort({ createdAt: -1 })
-      .skip((validPage - 1) * validLimit)
-      .limit(validLimit);
+      .sort({ createdAt: -1, requestText: 1 })
+      .skip((+validPage - 1) * +validLimit)
+      .limit(+validLimit);
+
     const totalCharacters = await DeepLUsageLogModel.aggregate([
       {
         $group: {
@@ -180,7 +192,7 @@ export class StatsService {
     const totalCharactersUsed = totalCharacters.length > 0 ? totalCharacters[0].totalCharacters : 0;
 
     return ServiceResponse.success("Logs found", {
-      logs,
+      logs: logs.map((log) => log.toJSON()),
       totalCharacters: totalCharactersUsed,
       totalRequests,
       totalPages: Math.ceil(totalRequests / validLimit),
