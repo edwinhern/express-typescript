@@ -178,10 +178,7 @@ export class QuestionService {
     return category;
   }
 
-  async generateQuestions(
-    // sessionId: string,
-    generateQuestionsDto: GenerateQuestionsDto,
-  ): Promise<
+  async generateQuestions(generateQuestionsDto: GenerateQuestionsDto): Promise<
     ServiceResponse<{
       questions: IQuestion[];
       totalTokensUsed: number;
@@ -193,48 +190,8 @@ export class QuestionService {
       const { questions, totalTokensUsed, completionTokensUsed } =
         await openaiService.generateQuestionsV2(generateQuestionsDto);
 
-      // if (requiredLanguages.length > 1) {
-      //   const neededLanguages = requiredLanguages.filter(
-      //     (language) => !questions[0].locales.some((locale) => locale.language === language),
-      //   );
-
-      //   for (const language of neededLanguages) {
-      //     await Promise.all(
-      //       questions.map(async (question) => {
-      //         const translatedQuestion = await this.deeplClient.translateText(
-      //           question.locales[0].question,
-      //           null,
-      //           language as TargetLanguageCode,
-      //         );
-
-      //         const translatedAnswers = await Promise.all([
-      //           ...question.locales[0].wrong.map((answer) =>
-      //             this.deeplClient.translateText(answer, null, language as TargetLanguageCode),
-      //           ),
-      //           this.deeplClient.translateText(question.locales[0].correct, null, language as TargetLanguageCode),
-      //         ]);
-
-      //         const newLocale = {
-      //           language,
-      //           question: translatedQuestion.text,
-      //           correct: translatedAnswers.pop()!.text,
-      //           wrong: translatedAnswers.map((answer) => answer.text),
-      //           isValid: false,
-      //         };
-
-      //         question.locales.push(newLocale);
-      //       }),
-      //     );
-      //   }
-      // }
-
       const categoryModel = await this.findOrCreateCategory(category);
       const categoryModelId = categoryModel._id as mongoose.Types.ObjectId;
-
-      // const session = await redisClient.get(`session:${sessionId}`);
-      // const sessionData = JSON.parse(session!);
-      // sessionData.questions.push(...questions);
-      // await redisClient.set(`session:${sessionId}`, JSON.stringify(sessionData), { EX: 86400 });
 
       const questionsIds: string[] = questions.map((question) => question.id);
       questions.forEach(async (question) => {
