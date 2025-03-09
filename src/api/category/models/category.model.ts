@@ -1,7 +1,8 @@
-// export const CategoryModel = mongoose.model<ICategory>("Category", CategorySchema);
-import mongoose, { Schema, type Document } from "mongoose";
-const AutoIncrementID = require("mongoose-sequence")(mongoose);
+const mongooseOld = require(require.resolve("mongoose-old", { paths: ["./mongoose-legacy/node_modules"] }));
 
+const { Schema, model, Document, Model } = mongooseOld;
+
+// Определяем интерфейсы
 export interface ICategoryLocaleSchema {
   language: string;
   value: string;
@@ -16,13 +17,14 @@ export interface ICategory extends Document {
   locales: ICategoryLocaleSchema[];
 }
 
-const CategoryLocaleSchema = new Schema<ICategoryLocaleSchema>({
+// Определяем схему без дженериков
+const CategoryLocaleSchema = new Schema({
   language: { type: String, required: true },
   value: { type: String, required: true },
 });
 
-export const CategorySchema = new Schema<ICategory>({
-  _id: { type: Number },
+const CategorySchema = new Schema({
+  _id: { type: Number, required: true },
   name: { type: String, required: true },
   parentId: { type: Number, ref: "Category", default: null },
   ancestors: { type: [Number], default: [] },
@@ -30,7 +32,5 @@ export const CategorySchema = new Schema<ICategory>({
   locales: { type: [CategoryLocaleSchema], required: true, default: [] },
 });
 
-// 🔥 Включаем автоинкремент `_id`
-CategorySchema.plugin(AutoIncrementID, { field: "_id", startAt: 1 });
-
-export const CategoryModel = mongoose.model<ICategory>("Category", CategorySchema);
+// Экспортируем модель с правильной типизацией
+export const CategoryModel: typeof Model = model("Category", CategorySchema);

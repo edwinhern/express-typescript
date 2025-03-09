@@ -1,6 +1,7 @@
 import { OpenAPIRegistry, OpenApiGeneratorV3 } from "@asteasolutions/zod-to-openapi";
 
 import { authRegistry } from "@/api/auth/authRouter";
+import { categoryRegistry } from "@/api/category/categoryRouter";
 import { healthCheckRegistry } from "@/api/healthCheck/healthCheckRouter";
 // import { openaiRegistry } from "@/api/openai/openaiRouter";
 import { questionRegistry } from "@/api/question/questionRouter";
@@ -15,6 +16,7 @@ export function generateOpenAPIDocument() {
     // openaiRegistry,
     questionRegistry,
     statsRegistry,
+    categoryRegistry,
   ]);
   const generator = new OpenApiGeneratorV3(registry.definitions);
 

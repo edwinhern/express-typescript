@@ -6,7 +6,8 @@ import { type IQuestionGenerationLog, QuestionGenerationLogModel } from "./model
 export class StatsService {
   //#region OpenAI Usage Logs
   async logQuestionGeneration(
-    categoryId: mongoose.Types.ObjectId,
+    // categoryId: mongoose.Types.ObjectId,
+    categoryId: number,
     questionIds: (string | mongoose.Types.ObjectId)[],
     tokensUsed: number,
     requestPrompt: string,

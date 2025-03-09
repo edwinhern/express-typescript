@@ -18,7 +18,8 @@ export enum QuestionType {
 }
 
 export interface IQuestion extends Document {
-  categoryId: mongoose.Types.ObjectId | ICategory;
+  // categoryId: mongoose.Types.ObjectId | ICategory;
+  categoryId: number | ICategory;
   status: QuestionStatus;
   track?: string;
   type: QuestionType;
@@ -44,7 +45,7 @@ const LocaleSchema = new Schema<ILocaleSchema>({
 
 const QuestionSchema = new Schema<IQuestion>(
   {
-    categoryId: { type: Schema.Types.ObjectId, ref: "Category", required: true },
+    categoryId: { type: Number, ref: "Category", required: true },
     status: { type: String, enum: ["proof_reading", "approved", "rejected", "pending"], required: true },
     track: { type: String },
     type: { type: String, enum: Object.values(QuestionType), required: true, default: QuestionType.OneChoice },

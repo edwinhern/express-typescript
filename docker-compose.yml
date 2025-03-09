@@ -11,18 +11,31 @@ services:
     volumes:
       - redis_data:/data
 
-  mongodb:
+  mongodb_old:
+    image: mongo:3.4.21
+    container_name: mongodb_old_service
+    restart: always
+    ports:
+      - "27018:27017"  # Используем 27018, чтобы не конфликтовать с новой версией
+    volumes:
+      - mongo_old_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: old_admin
+      MONGO_INITDB_ROOT_PASSWORD: old_secret
+
+  mongodb_new:
     image: mongo:latest
-    container_name: mongodb_service
+    container_name: mongodb_new_service
     restart: always
     ports:
       - "27017:27017"
     volumes:
-      - mongo_data:/data/db
+      - mongo_new_data:/data/db
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: secret
 
 volumes:
   redis_data:
-  mongo_data:
+  mongo_old_data:
+  mongo_new_data:

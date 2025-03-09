@@ -4,7 +4,7 @@ export interface GenerateQuestionsDto {
   readonly prompt: string;
   // readonly max_tokens: number;
   readonly count: number;
-  readonly category: string;
+  readonly category: number;
   readonly type: QuestionType;
   readonly difficulty: 1 | 2 | 3 | 4 | 5;
   readonly requiredLanguages: string[];

@@ -15,8 +15,9 @@ import requestLogger from "@/common/middleware/requestLogger";
 import { env } from "@/common/utils/envConfig";
 import { connectRedis } from "@/common/utils/redisClient";
 import cookieParser from "cookie-parser";
+import { categoryRouter } from "./api/category/categoryRouter";
 // import { openaiRouter } from "./api/openai/openaiRouter";
-import { connectMongoDB } from "./common/utils/mongoClient";
+import { connectMongoDB, connectMongoDBOld } from "./common/utils/mongoClient";
 
 const logger = pino({ name: "server start" });
 const app: Express = express();
@@ -36,6 +37,10 @@ app.use(cookieParser());
 // Request logging
 app.use(requestLogger);
 
+connectRedis();
+connectMongoDB();
+connectMongoDBOld();
+
 // Routes
 app.use("/health-check", healthCheckRouter);
 app.use("/users", userRouter);
@@ -43,9 +48,7 @@ app.use("/auth", authRouter);
 // app.use("/openai", openaiRouter);
 app.use("/questions", questionRouter);
 app.use("/stats", statsRouter);
-
-connectRedis();
-connectMongoDB();
+app.use("/categories", categoryRouter);
 
 // Swagger UI
 app.use(openAPIRouter);

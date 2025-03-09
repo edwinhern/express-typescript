@@ -190,19 +190,19 @@ export class QuestionService {
       const { questions, totalTokensUsed, completionTokensUsed } =
         await openaiService.generateQuestionsV2(generateQuestionsDto);
 
-      const categoryModel = await this.findOrCreateCategory(category);
-      const categoryModelId = categoryModel._id as mongoose.Types.ObjectId;
+      // const categoryModel = await this.findOrCreateCategory(category);
+      // const categoryModelId = categoryModel._id;
 
       const questionsIds: string[] = questions.map((question) => question.id);
       questions.forEach(async (question) => {
         question.requiredLanguages = requiredLanguages;
-        question.categoryId = categoryModelId;
+        question.categoryId = category;
         question.createdAt = new Date();
         question.updatedAt = new Date();
         await redisClient.set(`question:${question.id}`, JSON.stringify(question), { EX: 86400 });
       });
 
-      await statsService.logQuestionGeneration(categoryModelId, questionsIds, totalTokensUsed, prompt);
+      await statsService.logQuestionGeneration(category, questionsIds, totalTokensUsed, prompt);
 
       return ServiceResponse.success<{
         questions: any[];
@@ -419,11 +419,11 @@ export class QuestionService {
       }
 
       // Обрабатываем категории
-      const categoryMap = new Map<string, mongoose.Types.ObjectId>();
+      const categoryMap = new Map<string, number>();
       for (const question of validQuestions) {
         if (!categoryMap.has(question.categoryId)) {
           const categoryModel = await this.findOrCreateCategory(question.categoryId);
-          categoryMap.set(question.categoryId, categoryModel._id as mongoose.Types.ObjectId);
+          categoryMap.set(question.categoryId, categoryModel._id);
         }
       }
 
