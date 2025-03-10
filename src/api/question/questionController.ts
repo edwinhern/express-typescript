@@ -1,10 +1,11 @@
 import type { ServiceResponse } from "@/common/models/serviceResponse";
 import { handleServiceResponse } from "@/common/utils/httpHandlers";
 import type { Request, RequestHandler, Response } from "express";
+import { type translatedQuestionResponse, translationService } from "../translation/translationService";
 import type { GenerateQuestionsDto } from "./dto/generate-questions.dto";
 import type { GetQuestionFiltersDto } from "./dto/get-question-filters.dto";
 import type { IQuestion } from "./models/question.model";
-import { questionService, type translatedQuestionResponse } from "./questionService";
+import { questionService } from "./questionService";
 
 export class QuestionController {
   getQuestions: RequestHandler = async (req: Request, res: Response) => {
@@ -64,10 +65,8 @@ export class QuestionController {
     const { questionId } = req.params;
     const { language } = req.body;
 
-    const serviceResponse: ServiceResponse<translatedQuestionResponse | null> = await questionService.translateQuestion(
-      questionId,
-      language,
-    );
+    const serviceResponse: ServiceResponse<translatedQuestionResponse | null> =
+      await translationService.translateQuestion(questionId, language);
 
     handleServiceResponse(serviceResponse, res);
   };
@@ -76,7 +75,7 @@ export class QuestionController {
     const { questionId } = req.params;
     const { language } = req.body;
 
-    const serviceResponse = await questionService.translateGeneratedQuestion(questionId, language);
+    const serviceResponse = await translationService.translateGeneratedQuestion(questionId, language);
 
     handleServiceResponse(serviceResponse, res);
   };

@@ -43,7 +43,7 @@ questionRegistry.registerPath({
             category: z.number(),
             // difficulty: z.number().min(1).max(5).optional(),
             temperature: z.number().min(0).max(2).optional(),
-            type: z.enum(["multiple_choice", "one_choice"]).optional(),
+            type: z.enum(["map", "one_choice"]).optional(),
             model: z.string().default("gpt-3.5-turbo").optional(),
             requiredLanguages: z.array(
               z
@@ -137,7 +137,7 @@ questionRouter.post(
         difficulty: z.number().min(1).max(5).optional(),
         temperature: z.number().min(0).max(2).optional(),
         model: z.string().default("gpt-3.5-turbo").optional(),
-        type: z.enum(["multiple_choice", "one_choice"]).optional(),
+        type: z.enum(["map", "one_choice"]).optional(),
         requiredLanguages: z.array(
           z
             .string()

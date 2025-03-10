@@ -19,6 +19,4 @@ export interface GenerateQuestionsDto {
     | "o1-mini"
     | "o3"
     | "o3-mini";
-  // | "gpt-4.5"
-  // | "gpt-5";
 }

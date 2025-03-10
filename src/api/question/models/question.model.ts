@@ -6,19 +6,17 @@ export type QuestionStatus = "proof_reading" | "approved" | "rejected" | "pendin
 export interface ILocaleSchema {
   language: string;
   question: string;
-  correct: string;
-  wrong: string[];
+  correct: string | [number, number];
+  wrong?: string[];
   isValid: boolean;
 }
 
 export enum QuestionType {
-  TrueFalse = "true_false",
-  MultipleChoice = "multiple_choice",
   OneChoice = "one_choice",
+  Map = "map",
 }
 
 export interface IQuestion extends Document {
-  // categoryId: mongoose.Types.ObjectId | ICategory;
   categoryId: number | ICategory;
   status: QuestionStatus;
   track?: string;
@@ -38,8 +36,8 @@ export interface IQuestion extends Document {
 const LocaleSchema = new Schema<ILocaleSchema>({
   language: { type: String, required: true },
   question: { type: String, required: true },
-  correct: { type: String, required: true },
-  wrong: { type: [String], required: true },
+  correct: { type: Schema.Types.Mixed, required: true },
+  wrong: { type: [String], required: false },
   isValid: { type: Boolean, default: false },
 });
 

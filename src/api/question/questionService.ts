@@ -7,23 +7,13 @@ import type { SourceLanguageCode, TargetLanguageCode, Translator } from "deepl-n
 import { StatusCodes } from "http-status-codes";
 import type mongoose from "mongoose";
 import { openaiService } from "../openai/openaiService";
+import { translationService } from "../translation/translationService";
 import type { GenerateQuestionsDto } from "./dto/generate-questions.dto";
 import type { GetQuestionFiltersDto } from "./dto/get-question-filters.dto";
 import { CategoryModel } from "./models/category.model";
 import { type ILocaleSchema, type IQuestion, QuestionModel, type QuestionStatus } from "./models/question.model";
 
-const depplAuthKey = process.env.DEEPL_AUTH_KEY!;
-
-export type translatedQuestionResponse = {
-  question: string;
-  correct: string;
-  wrong: string[];
-  billedCharacters: number;
-};
-
 export class QuestionService {
-  deeplClient: Translator = new deepl.Translator(depplAuthKey);
-
   async getQuestions(getQuestionFiltersDto: GetQuestionFiltersDto): Promise<
     ServiceResponse<{
       questions: IQuestion[];
@@ -223,101 +213,6 @@ export class QuestionService {
     }
   }
 
-  async translateQuestionBase(
-    getQuestion: () => Promise<any>,
-    questionId: string,
-    language: TargetLanguageCode,
-  ): Promise<ServiceResponse<translatedQuestionResponse | null>> {
-    const question = await getQuestion();
-
-    if (!question) {
-      return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
-    }
-
-    const firstLocale: ILocaleSchema = question.locales[0];
-    const sourceLanguage = firstLocale.language;
-
-    const translations = await Promise.all([
-      this.deeplClient.translateText(firstLocale.question, sourceLanguage as SourceLanguageCode, language),
-      ...firstLocale.wrong.map((answer) =>
-        this.deeplClient.translateText(answer, sourceLanguage as SourceLanguageCode, language),
-      ),
-      this.deeplClient.translateText(firstLocale.correct, sourceLanguage as SourceLanguageCode, language),
-    ]);
-
-    const translatedQuestion = translations[0];
-    const translatedAnswers = translations.slice(1, -1);
-    const translatedCorrectAnswer = translations[translations.length - 1];
-
-    const newLocale = {
-      language,
-      question: translatedQuestion.text,
-      correct: translatedCorrectAnswer.text,
-      wrong: translatedAnswers.map((answer) => answer.text),
-      isValid: false,
-    };
-
-    // Логирование использования DeepL
-    const logDeepLUsagePromises = [
-      statsService.logDeepLUsage(
-        questionId,
-        translatedQuestion.billedCharacters,
-        sourceLanguage,
-        language,
-        firstLocale.question,
-        translatedQuestion.text,
-      ),
-      statsService.logDeepLUsage(
-        questionId,
-        translatedCorrectAnswer.billedCharacters,
-        sourceLanguage,
-        language,
-        firstLocale.correct,
-        translatedCorrectAnswer.text,
-      ),
-      ...translatedAnswers.map((answer, index) =>
-        statsService.logDeepLUsage(
-          questionId,
-          answer.billedCharacters,
-          sourceLanguage,
-          language,
-          firstLocale.wrong[index],
-          answer.text,
-        ),
-      ),
-    ];
-
-    await Promise.all(logDeepLUsagePromises);
-
-    return ServiceResponse.success<translatedQuestionResponse>("Question translated", {
-      question: translatedQuestion.text,
-      correct: newLocale.correct,
-      wrong: newLocale.wrong,
-      billedCharacters: translations.reduce((acc, trans) => acc + trans.billedCharacters, 0),
-    });
-  }
-
-  async translateQuestion(
-    questionId: string,
-    language: TargetLanguageCode,
-  ): Promise<ServiceResponse<translatedQuestionResponse | null>> {
-    return this.translateQuestionBase(() => QuestionModel.findById(questionId).lean(), questionId, language);
-  }
-
-  async translateGeneratedQuestion(
-    questionId: string,
-    language: TargetLanguageCode,
-  ): Promise<ServiceResponse<translatedQuestionResponse | null>> {
-    return this.translateQuestionBase(
-      async () => {
-        const question = await redisClient.get(`question:${questionId}`);
-        return question ? JSON.parse(question) : null;
-      },
-      questionId,
-      language,
-    );
-  }
-
   async updateQuestionValidationStatus(
     questionId: string,
     isValid: boolean,
@@ -407,40 +302,61 @@ export class QuestionService {
   async confirmQuestions(questionIds: string[]) {
     try {
       const redisKeys = questionIds.map((id) => `question:${id}`);
-      const questionsData = await redisClient.mGet(redisKeys); // Получаем все вопросы одним запросом
+      const questionsData = await redisClient.mGet(redisKeys); // Fetch all questions from Redis
 
-      // Фильтруем отсутствующие вопросы и парсим JSON
+      // Filter out missing questions and parse JSON
       const validQuestions = questionsData
         .map((data, index) => (data ? { id: questionIds[index], ...JSON.parse(data) } : null))
-        .filter((q) => q !== null) as Array<{ id: string; categoryId: string }>;
+        .filter((q) => q !== null) as Array<{ id: string; categoryId: string; requiredLanguages: string[] }>;
 
       if (validQuestions.length === 0) {
         return ServiceResponse.failure("No valid questions found", null, StatusCodes.NOT_FOUND);
       }
 
-      // Обрабатываем категории
-      const categoryMap = new Map<string, number>();
-      for (const question of validQuestions) {
-        if (!categoryMap.has(question.categoryId)) {
-          const categoryModel = await this.findOrCreateCategory(question.categoryId);
-          categoryMap.set(question.categoryId, categoryModel._id);
-        }
-      }
+      // Save questions to the database
+      const savedQuestions = await QuestionModel.insertMany(validQuestions);
 
-      // Создаем вопросы в базе данных
-      const savedQuestions = await QuestionModel.insertMany(
-        validQuestions.map((q) => ({
-          ...q,
-          categoryId: categoryMap.get(q.categoryId),
-        })),
-      );
-
-      // Удаляем подтвержденные вопросы из Redis
+      // Remove confirmed questions from Redis
       await redisClient.del(redisKeys);
 
+      // Update question status to "approved"
+      await QuestionModel.updateMany({ _id: { $in: savedQuestions.map((q) => q._id) } }, { status: "approved" });
+
+      // List of target languages for translation
+      const requiredLocales = ["ru", "uk", "en-US", "es", "fr", "de", "it", "pl", "tr"];
+
+      // Perform translation for each question
+      const translationPromises = savedQuestions.flatMap((question) =>
+        requiredLocales.map(async (language) => {
+          const translationResponse = await translationService.translateQuestion(
+            question.toJSON()._id.toString(),
+            language as TargetLanguageCode,
+          );
+
+          if (translationResponse.success && translationResponse.responseObject) {
+            await QuestionModel.updateOne(
+              { _id: question._id, "locales.language": language },
+              {
+                $set: { "locales.$": translationResponse.responseObject }, // Update existing locale
+              },
+            ).then((updateResult) => {
+              if (updateResult.matchedCount === 0) {
+                // If no matching locale was found, add it as a new one
+                return QuestionModel.updateOne(
+                  { _id: question._id },
+                  { $push: { locales: translationResponse.responseObject } },
+                );
+              }
+            });
+          }
+        }),
+      );
+
+      await Promise.all(translationPromises);
+
       return ServiceResponse.success<IQuestion[]>(
-        "Questions confirmed",
-        savedQuestions.map((q) => q.toObject()),
+        "Questions confirmed and translated",
+        savedQuestions.map((q) => q.toJSON()),
       );
     } catch (error) {
       console.error("Error confirming questions:", error);
