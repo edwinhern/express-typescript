@@ -18,6 +18,8 @@ const jwtRefreshSecret: jwt.Secret = process.env.JWT_REFRESH_SECRET!;
 const jwtAccessExpiration = process.env.JWT_ACCESS_EXPIRATION || "1h";
 const jwtRefreshExpiration = process.env.JWT_REFRESH_EXPIRATION || "7d";
 
+const SESSION_TTL = Number(process.env.SESSION_TTL) || 86400;
+
 export class AuthService {
   async login(
     login: string,
@@ -41,7 +43,7 @@ export class AuthService {
           questions: [],
           context: [],
         }),
-        { EX: 86400 },
+        { EX: SESSION_TTL },
       );
 
       logger.info(`Admin logged in: ${login}`);
@@ -110,7 +112,7 @@ export class AuthService {
           context: JSON.parse(sessionData).context,
           questions: JSON.parse(sessionData).questions,
         }),
-        { EX: 86400 },
+        { EX: SESSION_TTL },
       );
 
       return ServiceResponse.success("Token refreshed", {

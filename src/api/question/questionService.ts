@@ -13,6 +13,8 @@ import type { GetQuestionFiltersDto } from "./dto/get-question-filters.dto";
 import { CategoryModel } from "./models/category.model";
 import { type ILocaleSchema, type IQuestion, QuestionModel, type QuestionStatus } from "./models/question.model";
 
+const GENERATED_QUESTION_TTL = Number(process.env.GENERATED_QUESTION_TTL ?? 604800);
+
 export class QuestionService {
   async getQuestions(getQuestionFiltersDto: GetQuestionFiltersDto): Promise<
     ServiceResponse<{
@@ -189,7 +191,7 @@ export class QuestionService {
         question.categoryId = category;
         question.createdAt = new Date();
         question.updatedAt = new Date();
-        await redisClient.set(`question:${question.id}`, JSON.stringify(question), { EX: 86400 });
+        await redisClient.set(`question:${question.id}`, JSON.stringify(question), { EX: GENERATED_QUESTION_TTL });
       });
 
       await statsService.logQuestionGeneration(category, questionsIds, totalTokensUsed, prompt);
@@ -388,7 +390,7 @@ export class QuestionService {
 
   async updateGeneratedQuestion(questionId: string, question: IQuestion) {
     const updatedQuestion = await redisClient.set(`question:${questionId}`, JSON.stringify(question), {
-      EX: 86400,
+      EX: GENERATED_QUESTION_TTL,
     });
 
     if (!updatedQuestion) {
