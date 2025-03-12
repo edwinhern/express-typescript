@@ -3,7 +3,9 @@ import { logger } from "@/server";
 import OpenAI from "openai";
 // import { questionService } from "../question/questionService";
 import { v4 as uuidv4 } from "uuid";
+import type { GenerateQuestionsOpenAIDto } from "../question/dto/generate-questions-openai.dto";
 import type { GenerateQuestionsDto } from "../question/dto/generate-questions.dto";
+import { CategoryModel } from "../question/models/category.model";
 import { type ILocaleSchema, type IQuestion, QuestionType } from "../question/models/question.model";
 
 export class OpenAiService {
@@ -224,19 +226,24 @@ export class OpenAiService {
   ): Promise<{ questions: IQuestion[]; totalTokensUsed: number; completionTokensUsed: number }> {
     try {
       const {
-        category,
+        category: categoryId,
         type,
         requiredLanguages: [locale],
       } = generateQuestionsDto;
 
+      const category = await CategoryModel.findById(categoryId).lean();
+
       // 1️⃣ Build the prompt based on the question type
-      const prompt = this.buildPrompt(generateQuestionsDto);
+      const prompt = this.buildPrompt({
+        ...generateQuestionsDto,
+        category: category?.name || "",
+      });
 
       // 2️⃣ Send a request to OpenAI
       const response = await this.fetchOpenAIResponse(prompt, generateQuestionsDto);
 
       // 3️⃣ Parse OpenAI's response and return structured questions
-      const parsedQuestions = this.parseOpenAIResponse(response, category, type, locale);
+      const parsedQuestions = this.parseOpenAIResponse(response, categoryId, type, locale);
 
       return parsedQuestions;
     } catch (error) {
@@ -248,7 +255,7 @@ export class OpenAiService {
   /**
    * Builds a prompt dynamically based on the question type.
    */
-  private buildPrompt(generateQuestionsDto: GenerateQuestionsDto): string {
+  private buildPrompt(generateQuestionsDto: GenerateQuestionsOpenAIDto): string {
     const {
       prompt,
       count,

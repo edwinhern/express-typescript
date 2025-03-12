@@ -178,7 +178,7 @@ export class QuestionService {
     } | null>
   > {
     try {
-      const { category, prompt, requiredLanguages } = generateQuestionsDto;
+      const { category: categoryId, prompt, requiredLanguages } = generateQuestionsDto;
       const { questions, totalTokensUsed, completionTokensUsed } =
         await openaiService.generateQuestionsV2(generateQuestionsDto);
 
@@ -188,13 +188,13 @@ export class QuestionService {
       const questionsIds: string[] = questions.map((question) => question.id);
       questions.forEach(async (question) => {
         question.requiredLanguages = requiredLanguages;
-        question.categoryId = category;
+        question.categoryId = categoryId;
         question.createdAt = new Date();
         question.updatedAt = new Date();
         await redisClient.set(`question:${question.id}`, JSON.stringify(question), { EX: GENERATED_QUESTION_TTL });
       });
 
-      await statsService.logQuestionGeneration(category, questionsIds, totalTokensUsed, prompt);
+      await statsService.logQuestionGeneration(categoryId, questionsIds, totalTokensUsed, prompt);
 
       return ServiceResponse.success<{
         questions: any[];
