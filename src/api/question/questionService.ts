@@ -400,6 +400,7 @@ export class QuestionService {
 
     return ServiceResponse.success<IQuestion>("Question updated", question);
   }
+
   async confirmQuestion(questionId: string) {
     const question = await QuestionModel.findById(questionId);
 
@@ -407,30 +408,37 @@ export class QuestionService {
       return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
     }
 
-    question.status = "approved";
-    question.isValid = true;
+    let mainDbId = question.mainDbId;
 
-    // Преобразуем объект в обычный JS-объект
     const rawQuestion = question.toObject();
 
-    // Удаляем `_id`, чтобы MongoDB не конфликтовал с уникальностью
-    rawQuestion._id = undefined;
+    // Удаляем _id только если создаем новый документ, иначе используем старый mainDbId
+    if (!mainDbId) {
+      const biggestId = await OldQuestionModel.findOne().sort({ _id: -1 });
+      mainDbId = biggestId ? biggestId._id + 1 : 1;
 
-    const biggestId = await OldQuestionModel.findOne().sort({ _id: -1 });
-    const newId = biggestId ? biggestId._id + 1 : 1;
+      await new OldQuestionModel({
+        ...rawQuestion,
+        _id: mainDbId, // Устанавливаем корректный _id
+      }).save();
 
-    // Создаём новую запись в OldQuestionModel
-    // const oldQuestion = await new OldQuestionModel(rawQuestion).save();
-    const oldQuestion = new OldQuestionModel({
-      ...rawQuestion,
-      _id: newId,
-    }).save();
+      question.mainDbId = mainDbId;
+      await question.save();
+    } else {
+      const oldQuestion = await OldQuestionModel.findById(mainDbId);
 
-    // Доступ к _id после сохранения
-    question.mainDbId = newId;
+      if (!oldQuestion) {
+        await new OldQuestionModel({
+          ...rawQuestion,
+          _id: mainDbId, // Используем существующий mainDbId
+        }).save();
+      } else {
+        rawQuestion._id = mainDbId;
 
-    // Сохраняем обновлённую версию вопроса
-    await question.save();
+        oldQuestion.set(rawQuestion);
+        await oldQuestion.save();
+      }
+    }
 
     return ServiceResponse.success<IQuestion>("Question confirmed", question);
   }
