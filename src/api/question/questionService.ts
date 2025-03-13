@@ -11,6 +11,7 @@ import { translationService } from "../translation/translationService";
 import type { GenerateQuestionsDto } from "./dto/generate-questions.dto";
 import type { GetQuestionFiltersDto } from "./dto/get-question-filters.dto";
 import { CategoryModel } from "./models/category.model";
+import { OldQuestionModel } from "./models/question-old.model";
 import { type ILocaleSchema, type IQuestion, QuestionModel, type QuestionStatus } from "./models/question.model";
 
 const GENERATED_QUESTION_TTL = Number(process.env.GENERATED_QUESTION_TTL ?? 604800);
@@ -232,7 +233,7 @@ export class QuestionService {
     return this.updateQuestionValidationStatus(questionId, true);
   }
 
-  async rejectQuestions(questionIds: string[]) {
+  async rejectGeneratedQuestions(questionIds: string[]) {
     try {
       const redisKeys = questionIds.map((id) => `question:${id}`);
       const questionsData = await redisClient.mGet(redisKeys); // Получаем все вопросы одним запросом
@@ -259,9 +260,9 @@ export class QuestionService {
     }
   }
 
-  async rejectQuestion(questionId: string) {
+  async rejectGeneratedQuestion(questionId: string) {
     try {
-      const result = await this.rejectQuestions([questionId]);
+      const result = await this.rejectGeneratedQuestions([questionId]);
       return result.success
         ? ServiceResponse.success<IQuestion>("Question rejected", result.responseObject![0])
         : ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
@@ -301,7 +302,7 @@ export class QuestionService {
     return ServiceResponse.success<IQuestion>("Question translation deleted", question);
   }
 
-  async confirmQuestions(questionIds: string[]) {
+  async confirmGeneratedQuestions(questionIds: string[]) {
     try {
       const redisKeys = questionIds.map((id) => `question:${id}`);
       const questionsData = await redisClient.mGet(redisKeys); // Fetch all questions from Redis
@@ -366,9 +367,9 @@ export class QuestionService {
     }
   }
 
-  async confirmQuestion(questionId: string) {
+  async confirmGeneratedQuestion(questionId: string) {
     try {
-      const result = await this.confirmQuestions([questionId]);
+      const result = await this.confirmGeneratedQuestions([questionId]);
       return result.success
         ? ServiceResponse.success<IQuestion>("Question confirmed", result.responseObject![0])
         : ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
@@ -398,6 +399,50 @@ export class QuestionService {
     }
 
     return ServiceResponse.success<IQuestion>("Question updated", question);
+  }
+  async confirmQuestion(questionId: string) {
+    const question = await QuestionModel.findById(questionId);
+
+    if (!question) {
+      return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
+    }
+
+    question.status = "approved";
+    question.isValid = true;
+
+    // Преобразуем объект в обычный JS-объект
+    const rawQuestion = question.toObject();
+
+    // Удаляем `_id`, чтобы MongoDB не конфликтовал с уникальностью
+    rawQuestion._id = undefined;
+
+    const biggestId = await OldQuestionModel.findOne().sort({ _id: -1 });
+    const newId = biggestId ? biggestId._id + 1 : 1;
+
+    // Создаём новую запись в OldQuestionModel
+    // const oldQuestion = await new OldQuestionModel(rawQuestion).save();
+    const oldQuestion = new OldQuestionModel({
+      ...rawQuestion,
+      _id: newId,
+    }).save();
+
+    // Доступ к _id после сохранения
+    question.mainDbId = newId;
+
+    // Сохраняем обновлённую версию вопроса
+    await question.save();
+
+    return ServiceResponse.success<IQuestion>("Question confirmed", question);
+  }
+
+  async rejectQuestion(questionId: string) {
+    const deletedQuestion = await QuestionModel.findByIdAndDelete(questionId);
+
+    if (!deletedQuestion) {
+      return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
+    }
+
+    return ServiceResponse.success<IQuestion>("Question rejected", deletedQuestion);
   }
 }
 

@@ -4,7 +4,9 @@ import { authRegistry } from "@/api/auth/authRouter";
 import { categoryRegistry } from "@/api/category/categoryRouter";
 import { healthCheckRegistry } from "@/api/healthCheck/healthCheckRouter";
 // import { openaiRegistry } from "@/api/openai/openaiRouter";
-import { questionRegistry } from "@/api/question/questionRouter";
+// import { questionRegistry } from "@/api/question/questionRouter";
+
+import { questionRegistry } from "@/api/question/questionSwagger";
 import { statsRegistry } from "@/api/stats/statsRouter";
 import { userRegistry } from "@/api/user/userRouter";
 

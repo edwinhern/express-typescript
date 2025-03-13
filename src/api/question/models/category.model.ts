@@ -31,6 +31,6 @@ export const CategorySchema = new Schema<ICategory>({
 });
 
 // 🔥 Включаем автоинкремент `_id`
-CategorySchema.plugin(AutoIncrementID, { field: "_id", startAt: 1 });
+// CategorySchema.plugin(AutoIncrementID, { field: "_id", startAt: 1 });
 
 export const CategoryModel = mongoose.model<ICategory>("Category", CategorySchema);

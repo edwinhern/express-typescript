@@ -45,18 +45,18 @@ export class QuestionController {
     handleServiceResponse(serviceResponse, res);
   };
 
-  rejectQuestion: RequestHandler = async (req: Request, res: Response) => {
+  rejectGeneratedQuestion: RequestHandler = async (req: Request, res: Response) => {
     const { id } = req.params;
     // const { sessionId } = req.user!;
-    const serviceResponse: ServiceResponse<IQuestion | null> = await questionService.rejectQuestion(id);
+    const serviceResponse: ServiceResponse<IQuestion | null> = await questionService.rejectGeneratedQuestion(id);
 
     handleServiceResponse(serviceResponse, res);
   };
 
-  rejectQuestions: RequestHandler = async (req: Request, res: Response) => {
+  rejectGeneratedQuestions: RequestHandler = async (req: Request, res: Response) => {
     const { ids } = req.body;
     // const { sessionId } = req.user!;
-    const serviceResponse = await questionService.rejectQuestions(ids);
+    const serviceResponse = await questionService.rejectGeneratedQuestions(ids);
 
     handleServiceResponse(serviceResponse, res);
   };
@@ -105,19 +105,19 @@ export class QuestionController {
     handleServiceResponse(serviceResponse, res);
   };
 
-  confirmQuestion: RequestHandler = async (req: Request, res: Response) => {
+  confirmGeneratedQuestion: RequestHandler = async (req: Request, res: Response) => {
     const { id } = req.params;
     // const { sessionId } = req.user!;
 
-    const serviceResponse = await questionService.confirmQuestion(id);
+    const serviceResponse = await questionService.confirmGeneratedQuestion(id);
 
     handleServiceResponse(serviceResponse, res);
   };
 
-  confirmQuestions: RequestHandler = async (req: Request, res: Response) => {
+  confirmGeneratedQuestions: RequestHandler = async (req: Request, res: Response) => {
     const { ids } = req.body;
     // const { sessionId } = req.user!;
-    const serviceResponse = await questionService.confirmQuestions(ids);
+    const serviceResponse = await questionService.confirmGeneratedQuestions(ids);
 
     handleServiceResponse(serviceResponse, res);
   };
@@ -140,6 +140,42 @@ export class QuestionController {
     const serviceResponse = await questionService.updateGeneratedQuestion(id, question);
 
     handleServiceResponse(serviceResponse, res);
+  };
+
+  confirmQuestion: RequestHandler = async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    const serviceResponse = await questionService.confirmQuestion(id);
+
+    handleServiceResponse(serviceResponse, res);
+  };
+
+  rejectQuestion: RequestHandler = async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    const serviceResponse = await questionService.rejectQuestion(id);
+
+    handleServiceResponse(serviceResponse, res);
+  };
+
+  confirmQuestions: RequestHandler = async (req: Request, res: Response) => {
+    const { ids } = req.body;
+
+    throw new Error("Not implemented");
+
+    // const serviceResponse = await questionService.confirmQuestions(ids);
+
+    // handleServiceResponse(serviceResponse, res);
+  };
+
+  rejectQuestions: RequestHandler = async (req: Request, res: Response) => {
+    const { ids } = req.body;
+
+    throw new Error("Not implemented");
+
+    // const serviceResponse = await questionService.rejectQuestions(ids);
+
+    // handleServiceResponse(serviceResponse, res);
   };
 }
 
