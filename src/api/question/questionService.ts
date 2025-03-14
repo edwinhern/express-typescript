@@ -402,45 +402,52 @@ export class QuestionService {
   }
 
   async confirmQuestion(questionId: string) {
-    const question = await QuestionModel.findById(questionId);
+    try {
+      const question = await QuestionModel.findById(questionId);
 
-    if (!question) {
-      return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
-    }
+      if (!question) {
+        return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
+      }
 
-    let mainDbId = question.mainDbId;
+      let mainDbId = question.mainDbId;
 
-    const rawQuestion = question.toObject();
+      const rawQuestion = question.toObject();
 
-    // Удаляем _id только если создаем новый документ, иначе используем старый mainDbId
-    if (!mainDbId) {
-      const biggestId = await OldQuestionModel.findOne().sort({ _id: -1 });
-      mainDbId = biggestId ? biggestId._id + 1 : 1;
+      // Удаляем _id только если создаем новый документ, иначе используем старый mainDbId
+      if (!mainDbId) {
+        const biggestId = await OldQuestionModel.findOne().sort({ _id: -1 });
+        mainDbId = biggestId ? biggestId._id + 1 : 1;
 
-      await new OldQuestionModel({
-        ...rawQuestion,
-        _id: mainDbId, // Устанавливаем корректный _id
-      }).save();
-
-      question.mainDbId = mainDbId;
-      await question.save();
-    } else {
-      const oldQuestion = await OldQuestionModel.findById(mainDbId);
-
-      if (!oldQuestion) {
         await new OldQuestionModel({
           ...rawQuestion,
-          _id: mainDbId, // Используем существующий mainDbId
+          _id: mainDbId, // Устанавливаем корректный _id
         }).save();
+
+        question.mainDbId = mainDbId;
+        await question.save();
       } else {
-        rawQuestion._id = mainDbId;
+        const oldQuestion = await OldQuestionModel.findById(mainDbId);
 
-        oldQuestion.set(rawQuestion);
-        await oldQuestion.save();
+        if (!oldQuestion) {
+          await new OldQuestionModel({
+            ...rawQuestion,
+            _id: mainDbId, // Используем существующий mainDbId
+          }).save();
+        } else {
+          rawQuestion._id = mainDbId;
+          await oldQuestion.updateOne(rawQuestion);
+        }
       }
-    }
 
-    return ServiceResponse.success<IQuestion>("Question confirmed", question);
+      return ServiceResponse.success<IQuestion>("Question confirmed", question);
+    } catch (error) {
+      logger.error(`Error confirming question: ${error as Error}`);
+      return ServiceResponse.failure(
+        error instanceof Error ? error.message : "Failed to confirm question",
+        null,
+        StatusCodes.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   async rejectQuestion(questionId: string) {
