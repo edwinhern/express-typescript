@@ -439,6 +439,8 @@ export class QuestionService {
         }
       }
 
+      logger.info(`Question confirmed: ${questionId} -> ${mainDbId}`);
+
       return ServiceResponse.success<IQuestion>("Question confirmed", question);
     } catch (error) {
       logger.error(`Error confirming question: ${error as Error}`);
