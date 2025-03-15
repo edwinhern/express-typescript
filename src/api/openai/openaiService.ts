@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { GenerateQuestionsOpenAIDto } from "../question/dto/generate-questions-openai.dto";
 import type { GenerateQuestionsDto } from "../question/dto/generate-questions.dto";
 import { CategoryModel } from "../question/models/category.model";
-import { type ILocaleSchema, type IQuestion, QuestionType } from "../question/models/question.model";
+import type { ILocaleSchema, IQuestion, QuestionType } from "../question/models/question.model";
 
 export class OpenAiService {
   private openAi: OpenAI;
@@ -16,210 +16,6 @@ export class OpenAiService {
       apiKey: process.env.OPENAI_API_KEY,
     });
   }
-  async generateQuestionsV1(
-    prompt: string,
-    maxTokens: number | undefined,
-    count: number,
-    category: string | undefined,
-  ): Promise<{
-    questions: IQuestion[];
-    totalTokensUsed: number;
-    completionTokensUsed: number;
-  }> {
-    try {
-      const response = await this.openAi.chat.completions.create({
-        model: "gpt-4-turbo",
-        messages: [
-          {
-            role: "user",
-            content: `Generate ${count} multiple-choice questions using the prompt: "${prompt}". Each question must have one correct and three incorrect answers in the "${category}" category.`,
-          },
-        ],
-        functions: [
-          {
-            name: "create_questions",
-            description: "Generate a list of structured multiple-choice questions",
-            parameters: {
-              type: "object",
-              properties: {
-                questions: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      language: {
-                        type: "string",
-                        description: "Language of the question (e.g., en)",
-                      },
-                      question: {
-                        type: "string",
-                        description: "The text of the question",
-                      },
-                      correct: {
-                        type: "string",
-                        description: "The correct answer",
-                      },
-                      wrong: {
-                        type: "array",
-                        items: { type: "string" },
-                        description: "List of incorrect answers",
-                      },
-                    },
-                    required: ["language", "question", "correct", "wrong"],
-                  },
-                },
-              },
-              required: ["questions"],
-            },
-          },
-        ],
-        function_call: { name: "create_questions" },
-        max_tokens: maxTokens,
-      });
-
-      logger.info(`OpenAI API Response: ${JSON.stringify(response, null, 2)}`);
-
-      // Check if the response contains the function call arguments
-      if (!response.choices[0]?.message?.function_call?.arguments) {
-        throw new Error("No valid function response received from OpenAI.");
-      }
-
-      const functionArgs = JSON.parse(response.choices[0].message.function_call.arguments);
-
-      // Validate the structure of the parsed arguments
-      if (!functionArgs.questions || !Array.isArray(functionArgs.questions)) {
-        throw new Error("Invalid function response structure.");
-      }
-
-      return {
-        questions: functionArgs.questions.map((question: ILocaleSchema) => {
-          return {
-            // categoryId: category,
-            status: "pending",
-            type: QuestionType.OneChoice,
-            difficulty: 3,
-            requiredLanguages: ["en"], // TODO: Discuss with the team if we need by default to have multiple languages
-            tags: [],
-            locales: [
-              {
-                ...question,
-                isValid: false,
-              },
-            ],
-            isValid: false,
-          };
-        }),
-        totalTokensUsed: response.usage?.total_tokens || 0,
-        completionTokensUsed: response.usage?.completion_tokens || 0,
-      };
-    } catch (error) {
-      logger.error(`Error generating questions: ${(error as Error).message}`);
-      throw new Error("Failed to generate questions.");
-    }
-  }
-
-  // async generateQuestionsV2(
-  //   generateQuestionsDto: GenerateQuestionsDto,
-  // ): Promise<{ questions: IQuestion[]; totalTokensUsed: number; completionTokensUsed: number }> {
-  //   try {
-  //     const {
-  //       prompt,
-  //       count,
-  //       category,
-  //       temperature,
-  //       model,
-  //       requiredLanguages: [locale],
-  //     } = generateQuestionsDto;
-
-  //     const response = await this.openAi.chat.completions.create({
-  //       model,
-  //       messages: [
-  //         {
-  //           role: "user",
-  //           content: `Generate ${count} questions based on the prompt: "${prompt}".
-  //                     Each question must belong to the "${category}" category and be in "${locale}".
-
-  //                     Include reliable sources (e.g., Wikipedia, Britannica, government sites) for fact-checking, preferably with direct links.`,
-  //         },
-  //       ],
-  //       functions: [
-  //         {
-  //           name: "create_questions",
-  //           description: "Generate a list of structured multiple-choice questions with fact-checking sources",
-  //           parameters: {
-  //             type: "object",
-  //             properties: {
-  //               questions: {
-  //                 type: "array",
-  //                 items: {
-  //                   type: "object",
-  //                   properties: {
-  //                     language: { type: "string", description: "Question language (e.g., en, de, pl)" },
-  //                     question: { type: "string", description: "The question text" },
-  //                     correct: {
-  //                       type: "string",
-  //                       description: "The correct answer(s)",
-  //                     },
-  //                     wrong: {
-  //                       type: "array",
-  //                       items: { type: "string" },
-  //                       description: "List of incorrect answers",
-  //                     },
-  //                     sources: {
-  //                       type: "array",
-  //                       items: { type: "string" },
-  //                       description: "List of URLs or references for fact-checking the question",
-  //                     },
-  //                   },
-  //                   required: ["language", "question", "correct", "sources"],
-  //                 },
-  //               },
-  //             },
-  //             required: ["questions"],
-  //           },
-  //         },
-  //       ],
-  //       function_call: { name: "create_questions" },
-  //       temperature,
-  //     });
-
-  //     logger.info(`OpenAI API Response: ${JSON.stringify(response, null, 2)}`);
-
-  //     if (!response.choices[0]?.message?.function_call?.arguments) {
-  //       throw new Error("No valid function response received from OpenAI.");
-  //     }
-
-  //     const functionArgs = JSON.parse(response.choices[0].message.function_call.arguments);
-
-  //     if (!functionArgs.questions || !Array.isArray(functionArgs.questions)) {
-  //       throw new Error("Invalid function response structure.");
-  //     }
-
-  //     return {
-  //       questions: functionArgs.questions.map((question: ILocaleSchema) => ({
-  //         id: uuidv4(),
-  //         categoryId: category,
-  //         status: "pending",
-  //         type: QuestionType.OneChoice,
-  //         difficulty: 3,
-  //         requiredLanguages: [locale],
-  //         tags: [],
-  //         locales: [
-  //           {
-  //             ...question,
-  //             isValid: false,
-  //           },
-  //         ],
-  //         isValid: false,
-  //       })),
-  //       totalTokensUsed: response.usage?.total_tokens || 0,
-  //       completionTokensUsed: response.usage?.completion_tokens || 0,
-  //     };
-  //   } catch (error) {
-  //     logger.error(`Error generating questions: ${(error as Error).message}`);
-  //     throw new Error("Failed to generate questions.");
-  //   }
-  // }
 
   async generateQuestionsV2(
     generateQuestionsDto: GenerateQuestionsDto,
@@ -381,6 +177,117 @@ export class OpenAiService {
       totalTokensUsed: response.usage?.total_tokens || 0,
       completionTokensUsed: response.usage?.completion_tokens || 0,
     };
+  }
+
+  async validateQuestionTranslation(
+    originalLocale: ILocaleSchema,
+    targetLocale: ILocaleSchema,
+  ): Promise<{
+    isValid: boolean;
+    suggestions: Partial<ILocaleSchema>[]; // Может быть несколько вариантов предложений
+    totalTokensUsed: number;
+    completionTokensUsed: number;
+  }> {
+    try {
+      const isMapType = Array.isArray(originalLocale.correct) && originalLocale.correct.length === 2;
+
+      const requestPayload: any = {
+        original_language: originalLocale.language,
+        original_question: originalLocale.question,
+        target_language: targetLocale.language,
+        target_question: targetLocale.question,
+      };
+
+      if (!isMapType) {
+        requestPayload.original_correct = originalLocale.correct;
+        requestPayload.target_correct = targetLocale.correct;
+        requestPayload.original_wrong = originalLocale.wrong;
+        requestPayload.target_wrong = targetLocale.wrong;
+      }
+
+      const response = await this.openAi.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert multilingual translation validator. Your job is to determine whether a translated question is **accurate**.
+            
+            🟢 If the translation is **completely correct**, return **"isValid: true"**. No suggestions are needed.
+            🔴 If there are **errors or better alternatives**, return **"isValid: false"** and suggest corrections.
+  
+            - Ensure the translation conveys the same **meaning, structure, and context**.
+            - If incorrect, provide **one or more alternative translations** in "suggestions".
+            - If correct, **no suggestions are needed**.
+  
+            **Output format:** { isValid: true/false, suggestions: [...] }`,
+          },
+          {
+            role: "user",
+            content: JSON.stringify(requestPayload),
+          },
+        ],
+        functions: [
+          {
+            name: "validate_translation",
+            description: "Checks translation validity and provides alternative suggestions if needed",
+            parameters: {
+              type: "object",
+              properties: {
+                isValid: { type: "boolean", description: "Is the translation fully accurate?" },
+                suggestions: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      question: { type: "string", description: "Suggested alternative for the question text" },
+                      correct: isMapType
+                        ? { type: "array", items: { type: "number" }, description: "Geolocation remains unchanged" }
+                        : { type: "string", description: "Suggested correct answer" },
+                      wrong: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "List of suggested incorrect answers (if applicable)",
+                      },
+                    },
+                    required: isMapType ? ["question"] : ["question", "correct", "wrong"],
+                  },
+                },
+              },
+              required: ["isValid"],
+            },
+          },
+        ],
+        function_call: { name: "validate_translation" },
+      });
+
+      if (!response.choices[0]?.message?.function_call?.arguments) {
+        throw new Error("No valid function response received from OpenAI.");
+      }
+
+      const functionArgs = JSON.parse(response.choices[0].message.function_call.arguments);
+
+      if (typeof functionArgs.isValid !== "boolean") {
+        throw new Error("Invalid function response structure.");
+      }
+
+      return {
+        isValid: functionArgs.isValid,
+        totalTokensUsed: response.usage?.total_tokens || 0,
+        completionTokensUsed: response.usage?.completion_tokens || 0,
+        suggestions: functionArgs.isValid
+          ? [] // ✅ Если перевод правильный, возвращаем пустой массив
+          : functionArgs.suggestions.map((suggestion: any) => ({
+              language: targetLocale.language,
+              question: suggestion.question,
+              correct: suggestion.correct ?? targetLocale.correct,
+              wrong: suggestion.wrong ?? targetLocale.wrong,
+              isValid: false, // ❗ Так как даём предложения, перевод считается некорректным
+            })),
+      };
+    } catch (error) {
+      logger.error(`Error validating translation: ${(error as Error).message}`);
+      throw new Error("Failed to validate translation.");
+    }
   }
 }
 

@@ -461,6 +461,72 @@ export class QuestionService {
 
     return ServiceResponse.success<IQuestion>("Question rejected", deletedQuestion);
   }
+
+  async validateTranslationBase(
+    questionData: IQuestion | null,
+    // questionId: string,
+    originalLanguage: string,
+    targetLanguage: string,
+  ): Promise<
+    ServiceResponse<{
+      isValid: boolean;
+      suggestions: Partial<ILocaleSchema>[] | null;
+      totalTokensUsed: number;
+      completionTokensUsed: number;
+    } | null>
+  > {
+    if (!questionData) {
+      return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
+    }
+
+    const originalLocaleOrFirst =
+      questionData.locales.find((locale) => locale.language === originalLanguage) || questionData.locales[0];
+
+    const translationLocale = questionData.locales.find((locale) => locale.language === targetLanguage);
+
+    if (!translationLocale) {
+      return ServiceResponse.failure("Translation not found", null, StatusCodes.NOT_FOUND);
+    }
+
+    const { isValid, suggestions, totalTokensUsed, completionTokensUsed } =
+      await openaiService.validateQuestionTranslation(originalLocaleOrFirst, translationLocale);
+
+    return ServiceResponse.success("Translation validated", {
+      isValid,
+      suggestions,
+      totalTokensUsed,
+      completionTokensUsed,
+    });
+  }
+
+  async validateTranslation(questionId: string, originalLanguage: string, targetLanguage: string) {
+    try {
+      const question = await QuestionModel.findById(questionId);
+      return this.validateTranslationBase(question?.toObject() ?? null, originalLanguage, targetLanguage);
+    } catch (error) {
+      logger.error(`Error validating translation: ${error as Error}`);
+      return ServiceResponse.failure(
+        error instanceof Error ? error.message : "Failed to validate translation",
+        null,
+        StatusCodes.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async validateGeneratedTranslation(questionId: string, originalLanguage: string, targetLanguage: string) {
+    try {
+      const question = await redisClient.get(`question:${questionId}`);
+      const parsedQuestion = question ? (JSON.parse(question) as IQuestion) : null;
+      return this.validateTranslationBase(parsedQuestion, originalLanguage, targetLanguage);
+    } catch (error) {
+      logger.error(`Error validating translation: ${error as Error}`);
+      return ServiceResponse.failure(
+        error instanceof Error ? error.message : "Failed to validate translation",
+        null,
+        StatusCodes.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }
 
 export const questionService = new QuestionService();

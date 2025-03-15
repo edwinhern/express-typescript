@@ -3,7 +3,12 @@ import express, { type Router } from "express";
 import { z } from "zod";
 import { accessTokenGuard } from "../auth/middlewares/accessToken.middleware";
 import { questionController } from "./questionController";
-import { validateGenerateQuestions, validateGetGeneratedQuestions, validateUpdateQuestion } from "./validators";
+import {
+  validateGenerateQuestions,
+  validateGetGeneratedQuestions,
+  validateTranslationRequest,
+  validateUpdateQuestion,
+} from "./validators";
 
 export const questionRouter: Router = express.Router();
 
@@ -189,4 +194,19 @@ questionRouter.post(
   ),
   questionController.translateGeneratedQuestion,
 );
+
+questionRouter.post(
+  "/history/validate-translation/:questionId",
+  accessTokenGuard,
+  validateRequest(validateTranslationRequest),
+  questionController.validateTranslation,
+);
+
+questionRouter.post(
+  "/generated/validate-translation/:questionId",
+  accessTokenGuard,
+  validateRequest(validateTranslationRequest),
+  questionController.validateGeneratedTranslation,
+);
+
 //#endregion

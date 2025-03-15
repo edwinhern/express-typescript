@@ -2,10 +2,10 @@ import { z } from "zod";
 
 export const validateUpdateQuestion = z.object({
   params: z.object({
-    id: z.string().min(1, { message: "Question ID is required" }),
+    id: z.string({ message: "Question ID is required" }),
   }),
   body: z.object({
-    categoryId: z.string().optional(),
+    categoryId: z.number().optional(),
     status: z.string().optional(),
     track: z.string().optional(),
     type: z.string().optional(),

@@ -1,7 +1,11 @@
 import { createApiResponse } from "@/api-docs/openAPIResponseBuilders";
 import { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
-import { generateQuestionRequestSchema, updateQuestionRequestSchema } from "./swagger-schemas";
+import {
+  generateQuestionRequestSchema,
+  updateQuestionRequestSchema,
+  validateTranslationRequestSchema,
+} from "./swagger-schemas";
 
 export const questionRegistry = new OpenAPIRegistry();
 
@@ -341,6 +345,25 @@ questionRegistry.registerPath({
       id: z.string().min(1, { message: "Question ID is required" }),
     }),
   },
+  responses: createApiResponse(z.object({}), "Success"),
+  security: [{ BearerAuth: [] }],
+});
+
+questionRegistry.registerPath({
+  method: "post",
+  path: "/questions/history/validate-translation/{questionId}",
+  tags: ["Questions (History)"],
+  request: validateTranslationRequestSchema,
+  responses: createApiResponse(z.object({}), "Success"),
+  security: [{ BearerAuth: [] }],
+});
+
+// This route needed for validation of translation for generated questions
+questionRegistry.registerPath({
+  method: "post",
+  path: "/questions/generated/validate-translation/{questionId}",
+  tags: ["Questions (Generated)"],
+  request: validateTranslationRequestSchema,
   responses: createApiResponse(z.object({}), "Success"),
   security: [{ BearerAuth: [] }],
 });

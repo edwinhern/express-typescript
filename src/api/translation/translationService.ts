@@ -54,29 +54,29 @@ export class TranslationService {
       return {
         question: translatedQuestion.text,
         language,
-        correct: firstLocale.correct,
+        correct: firstLocale.correct, // Координаты не переводим
         billedCharacters: translatedQuestion.billedCharacters,
       };
     }
 
     // Перевод вопроса, неправильных и правильного ответа
-    const [translatedQuestion, ...translatedAnswers] = await Promise.all([
+    const translations = await Promise.all([
       this.deeplClient.translateText(firstLocale.question, sourceLanguage as SourceLanguageCode, language),
-      ...(firstLocale.wrong
-        ? firstLocale.wrong.map((answer) =>
-            this.deeplClient.translateText(answer, sourceLanguage as SourceLanguageCode, language),
-          )
-        : []),
+      ...(firstLocale.wrong || []).map((answer) =>
+        this.deeplClient.translateText(answer, sourceLanguage as SourceLanguageCode, language),
+      ),
       typeof firstLocale.correct === "string"
         ? this.deeplClient.translateText(firstLocale.correct, sourceLanguage as SourceLanguageCode, language)
         : Promise.resolve({ text: firstLocale.correct.toString(), billedCharacters: 0 }),
     ]);
 
-    const billedCharacters = translatedAnswers.reduce(
-      (acc, answer) => acc + answer.billedCharacters,
-      translatedQuestion.billedCharacters,
-    );
+    const translatedQuestion = translations[0];
+    const translatedCorrectAnswer = translations[translations.length - 1]; // Последний элемент - это correct
+    const translatedWrongAnswers = translations.slice(1, -1); // Всё кроме первого и последнего - это wrong
 
+    const billedCharacters = translations.reduce((acc, trans) => acc + trans.billedCharacters, 0);
+
+    // Логируем использование DeepL
     await Promise.all([
       statsService.logDeepLUsage(
         questionId,
@@ -88,13 +88,13 @@ export class TranslationService {
       ),
       statsService.logDeepLUsage(
         questionId,
-        translatedAnswers[translatedAnswers.length - 1].billedCharacters,
+        translatedCorrectAnswer.billedCharacters,
         sourceLanguage,
         language,
         typeof firstLocale.correct === "string" ? firstLocale.correct : firstLocale.correct.toString(),
-        translatedAnswers.pop()?.text ?? "",
+        translatedCorrectAnswer.text,
       ),
-      ...translatedAnswers.map((answer, index) =>
+      ...translatedWrongAnswers.map((answer, index) =>
         statsService.logDeepLUsage(
           questionId,
           answer.billedCharacters,
@@ -108,8 +108,8 @@ export class TranslationService {
 
     return {
       question: translatedQuestion.text,
-      correct: translatedAnswers.pop()?.text ?? "",
-      wrong: translatedAnswers.map((answer) => answer.text),
+      correct: translatedCorrectAnswer.text, // Теперь correct сохраняется правильно
+      wrong: translatedWrongAnswers.map((answer) => answer.text), // wrong остаётся массивом
       language,
       billedCharacters,
     };
