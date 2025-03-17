@@ -11,7 +11,7 @@ import { translationService } from "../translation/translationService";
 import type { GenerateQuestionsDto } from "./dto/generate-questions.dto";
 import type { GetQuestionFiltersDto } from "./dto/get-question-filters.dto";
 import { CategoryModel } from "./models/category.model";
-import { OldQuestionModel } from "./models/question-old.model";
+import { OldQuestionModel, QuestionType } from "./models/question-old.model";
 import { type ILocaleSchema, type IQuestion, QuestionModel, type QuestionStatus } from "./models/question.model";
 
 const GENERATED_QUESTION_TTL = Number(process.env.GENERATED_QUESTION_TTL ?? 604800);
@@ -412,6 +412,9 @@ export class QuestionService {
       let mainDbId = question.mainDbId;
 
       const rawQuestion = question.toObject();
+
+      rawQuestion.status = "in_progress" as QuestionStatus;
+      // rawQuestion.type = QuestionType.Choice;
 
       // Удаляем _id только если создаем новый документ, иначе используем старый mainDbId
       if (!mainDbId) {

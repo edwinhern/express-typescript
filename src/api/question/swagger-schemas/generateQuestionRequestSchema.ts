@@ -11,7 +11,7 @@ export const generateQuestionRequestSchema = {
           category: z.number(),
           // difficulty: z.number().min(1).max(5).optional(),
           temperature: z.number().min(0).max(2).optional(),
-          type: z.enum(["map", "one_choice"]).optional(),
+          type: z.enum(["map", "choice"]).optional(),
           model: z.string().default("gpt-3.5-turbo").optional(),
           requiredLanguages: z.array(
             z
@@ -34,7 +34,7 @@ export const generateQuestionRequestSchema = {
               category: 1,
               difficulty: 3,
               temperature: 0.7,
-              type: "one_choice",
+              type: "choice",
               requiredLanguages: ["en"],
             },
             description:
@@ -49,7 +49,7 @@ export const generateQuestionRequestSchema = {
               category: 3,
               difficulty: 3,
               temperature: 1.0,
-              type: "one_choice",
+              type: "choice",
               requiredLanguages: ["en"],
             },
             description: "Generate 5 one choice questions about the history of the United States by using GPT-4o model",
