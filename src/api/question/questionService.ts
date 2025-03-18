@@ -414,7 +414,14 @@ export class QuestionService {
       const rawQuestion = question.toObject();
 
       rawQuestion.status = "in_progress" as QuestionStatus;
+      rawQuestion.track = "general";
       // rawQuestion.type = QuestionType.Choice;
+
+      const ukrainianLocale = rawQuestion.locales.find((locale) => locale.language === "uk");
+      rawQuestion.locales = rawQuestion.locales.filter((locale) => locale.language !== "uk");
+      ukrainianLocale!.language = "ua";
+
+      rawQuestion.locales.push(ukrainianLocale!);
 
       // Удаляем _id только если создаем новый документ, иначе используем старый mainDbId
       if (!mainDbId) {
