@@ -424,6 +424,7 @@ export class QuestionService {
       ukrainianLocale!.language = "ua";
 
       rawQuestion.locales.push(ukrainianLocale!);
+      rawQuestion.requiredLanguages = rawQuestion.locales.map((locale) => locale.language);
 
       // Удаляем _id только если создаем новый документ, иначе используем старый mainDbId
       if (!mainDbId) {
