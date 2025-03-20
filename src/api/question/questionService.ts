@@ -418,7 +418,9 @@ export class QuestionService {
       // rawQuestion.type = QuestionType.Choice;
 
       const ukrainianLocale = rawQuestion.locales.find((locale) => locale.language === "uk");
-      rawQuestion.locales = rawQuestion.locales.filter((locale) => locale.language !== "uk");
+      rawQuestion.locales = rawQuestion.locales.filter(
+        (locale) => locale.language !== "uk" && locale.language !== "en-US",
+      );
       ukrainianLocale!.language = "ua";
 
       rawQuestion.locales.push(ukrainianLocale!);
