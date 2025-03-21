@@ -19,6 +19,28 @@ questionRegistry.registerPath({
 });
 
 questionRegistry.registerPath({
+  method: "post",
+  path: "/questions/parse",
+  tags: ["Questions"],
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            categoryId: z.number().int().positive(),
+            boilerplateText: z.string(),
+            language: z.string().min(2).max(2),
+            type: z.enum(["choice", "map"], { message: "Invalid question type" }),
+          }),
+        },
+      },
+    },
+  },
+  responses: createApiResponse(z.object({}), "Success"),
+  security: [{ BearerAuth: [] }],
+});
+
+questionRegistry.registerPath({
   method: "get",
   path: "/questions/history",
   tags: ["Questions (History)"],

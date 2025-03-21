@@ -22,6 +22,22 @@ questionRouter.post(
   questionController.generateQuestions,
 );
 
+questionRouter.post(
+  "/parse",
+  accessTokenGuard,
+  validateRequest(
+    z.object({
+      body: z.object({
+        categoryId: z.number().int().positive(),
+        boilerplateText: z.string(),
+        language: z.string().min(2).max(2),
+        type: z.enum(["choice", "map"], { message: "Invalid question type" }),
+      }),
+    }),
+  ),
+  questionController.parseQuestions,
+);
+
 questionRouter.get(
   "/generated",
   accessTokenGuard,

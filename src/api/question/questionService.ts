@@ -11,7 +11,7 @@ import { translationService } from "../translation/translationService";
 import type { GenerateQuestionsDto } from "./dto/generate-questions.dto";
 import type { GetQuestionFiltersDto } from "./dto/get-question-filters.dto";
 import { CategoryModel } from "./models/category.model";
-import { OldQuestionModel, QuestionType } from "./models/question-old.model";
+import { OldQuestionModel, type QuestionType } from "./models/question-old.model";
 import { type ILocaleSchema, type IQuestion, QuestionModel, type QuestionStatus } from "./models/question.model";
 
 const GENERATED_QUESTION_TTL = Number(process.env.GENERATED_QUESTION_TTL ?? 604800);
@@ -210,6 +210,56 @@ export class QuestionService {
       logger.error(`Error generating questions: ${error as Error}`);
       return ServiceResponse.failure(
         error instanceof Error ? error.message : "Failed to generate questions",
+        null,
+        StatusCodes.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async parseQuestions(
+    categoryId: number,
+    boilerplateText: string,
+    language: string,
+    type: QuestionType,
+  ): Promise<
+    ServiceResponse<{
+      questions: IQuestion[];
+      totalTokensUsed: number;
+      completionTokensUsed: number;
+    } | null>
+  > {
+    try {
+      const { questions, totalTokensUsed, completionTokensUsed } = await openaiService.parseQuestions(
+        categoryId,
+        boilerplateText,
+        language,
+        type,
+      );
+
+      const questionsIds: string[] = questions.map((question) => question.id);
+      questions.forEach(async (question) => {
+        question.requiredLanguages = [language];
+        question.categoryId = categoryId;
+        question.createdAt = new Date();
+        question.updatedAt = new Date();
+        await redisClient.set(`question:${question.id}`, JSON.stringify(question), { EX: GENERATED_QUESTION_TTL });
+      });
+
+      await statsService.logQuestionGeneration(categoryId, questionsIds, totalTokensUsed, boilerplateText);
+
+      return ServiceResponse.success<{
+        questions: any[];
+        totalTokensUsed: number;
+        completionTokensUsed: number;
+      }>("Questions parsed", {
+        questions,
+        totalTokensUsed,
+        completionTokensUsed,
+      });
+    } catch (error) {
+      logger.error(`Error parsing questions: ${error as Error}`);
+      return ServiceResponse.failure(
+        error instanceof Error ? error.message : "Failed to parse questions",
         null,
         StatusCodes.INTERNAL_SERVER_ERROR,
       );

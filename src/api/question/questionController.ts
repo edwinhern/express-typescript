@@ -84,6 +84,13 @@ export class QuestionController {
     handleServiceResponse(serviceResponse, res);
   };
 
+  parseQuestions: RequestHandler = async (req: Request, res: Response) => {
+    const { categoryId, boilerplateText, language, type } = req.body;
+    const serviceResponse = await questionService.parseQuestions(categoryId, boilerplateText, language, type);
+
+    handleServiceResponse(serviceResponse, res);
+  };
+
   deleteQuestion: RequestHandler = async (req: Request, res: Response) => {
     const { id } = req.params;
 

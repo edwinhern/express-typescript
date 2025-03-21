@@ -48,6 +48,21 @@ export class OpenAiService {
     }
   }
 
+  async parseQuestions(categoryId: number, boilerplateText: string, language = "en", type = "choice" as QuestionType) {
+    try {
+      // const category = await CategoryModel.findById(categoryId).lean();
+
+      const response = await this.parseQuestionsWithOpenAI(boilerplateText, language, type);
+
+      const parsedQuestions = this.parseOpenAIResponse(response, categoryId, type, language);
+
+      return parsedQuestions;
+    } catch (error) {
+      logger.error(`Error parsing questions: ${(error as Error).message}`);
+      throw new Error("Failed to parse questions.");
+    }
+  }
+
   /**
    * Builds a prompt dynamically based on the question type.
    */
@@ -73,6 +88,64 @@ export class OpenAiService {
     return basePrompt;
   }
 
+  getCreateQuestionsFunctionSignature(functionName: string, type = "choice") {
+    const isMap = type === "map";
+
+    return {
+      name: functionName,
+      description: "Generate structured questions, including map-based questions with coordinates",
+      parameters: {
+        type: "object",
+        properties: {
+          questions: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                language: {
+                  type: "string",
+                  description: "Language of the question",
+                },
+                question: {
+                  type: "string",
+                  description: "The question text",
+                },
+                correct: isMap
+                  ? {
+                      type: "array",
+                      items: { type: "number" },
+                      minItems: 2,
+                      maxItems: 2,
+                      description: "Latitude and longitude coordinates for the correct location",
+                    }
+                  : {
+                      type: "string",
+                      description: "The correct answer",
+                    },
+                wrong: isMap
+                  ? undefined
+                  : {
+                      type: "array",
+                      items: { type: "string" },
+                      description: "List of incorrect answers",
+                    },
+                sources: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "URLs for fact-checking (Wikipedia, Britannica, Google Maps)",
+                },
+              },
+              required: isMap
+                ? ["language", "question", "correct", "sources"]
+                : ["language", "question", "correct", "wrong", "sources"],
+            },
+          },
+        },
+        required: ["questions"],
+      },
+    };
+  }
+
   /**
    * Sends a request to OpenAI.
    */
@@ -82,58 +155,96 @@ export class OpenAiService {
     return await this.openAi.chat.completions.create({
       model,
       messages: [{ role: "user", content: prompt }],
-      functions: [
-        {
-          name: "create_questions",
-          description: "Generate structured questions, including map-based questions with coordinates",
-          parameters: {
-            type: "object",
-            properties: {
-              questions: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    language: { type: "string", description: "Language of the question" },
-                    question: { type: "string", description: "The question text" },
-                    correct:
-                      type === "map"
-                        ? {
-                            type: "array",
-                            items: { type: "number" },
-                            minItems: 2,
-                            maxItems: 2,
-                            description: "Latitude and longitude coordinates for the correct location",
-                          }
-                        : { type: "string", description: "The correct answer" },
-                    wrong:
-                      type === "map"
-                        ? undefined
-                        : {
-                            type: "array",
-                            items: { type: "string" },
-                            description: "List of incorrect answers",
-                          },
-                    sources: {
-                      type: "array",
-                      items: { type: "string" },
-                      description: "URLs for fact-checking (Wikipedia, Britannica, Google Maps)",
-                    },
-                  },
-                  required:
-                    type === "map"
-                      ? ["language", "question", "correct", "sources"]
-                      : ["language", "question", "correct", "wrong", "sources"],
-                },
-              },
-            },
-            required: ["questions"],
-          },
-        },
-      ],
+      // functions: [
+      //   {
+      //     name: "create_questions",
+      //     description: "Generate structured questions, including map-based questions with coordinates",
+      //     parameters: {
+      //       type: "object",
+      //       properties: {
+      //         questions: {
+      //           type: "array",
+      //           items: {
+      //             type: "object",
+      //             properties: {
+      //               language: { type: "string", description: "Language of the question" },
+      //               question: { type: "string", description: "The question text" },
+      //               correct:
+      //                 type === "map"
+      //                   ? {
+      //                       type: "array",
+      //                       items: { type: "number" },
+      //                       minItems: 2,
+      //                       maxItems: 2,
+      //                       description: "Latitude and longitude coordinates for the correct location",
+      //                     }
+      //                   : { type: "string", description: "The correct answer" },
+      //               wrong:
+      //                 type === "map"
+      //                   ? undefined
+      //                   : {
+      //                       type: "array",
+      //                       items: { type: "string" },
+      //                       description: "List of incorrect answers",
+      //                     },
+      //               sources: {
+      //                 type: "array",
+      //                 items: { type: "string" },
+      //                 description: "URLs for fact-checking (Wikipedia, Britannica, Google Maps)",
+      //               },
+      //             },
+      //             required:
+      //               type === "map"
+      //                 ? ["language", "question", "correct", "sources"]
+      //                 : ["language", "question", "correct", "wrong", "sources"],
+      //           },
+      //         },
+      //       },
+      //       required: ["questions"],
+      //     },
+      //   },
+      // ],
+      functions: [this.getCreateQuestionsFunctionSignature("create_questions", type)],
       function_call: { name: "create_questions" },
       temperature,
     });
+  }
+
+  async parseQuestionsWithOpenAI(boilerplateText: string, language = "en", type = "choice") {
+    const response = await this.openAi.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: `
+            You are given a text that contains multiple-choice quiz questions. Your task is to extract structured question data based on the following logic:
+            
+            1. If an answer is marked as correct — using ✅, ✔️, ☑️, or labeled with words like "correct", "правильний", "верный", etc. — treat it as correct.
+            2. If an answer is marked as incorrect — using ❌, ✖️, or labeled with words like "incorrect", "неправильный", etc. — treat it as incorrect.
+            3. If no markers are provided, choose the correct answer based on your knowledge and context.
+            
+            Each question must be returned as an object with:
+            - "language": set this to "${language}"
+            - "question": the full question text.
+            - "correct": the correct answer as a string.
+            - "wrong": an array of incorrect answers. If type is "choice", always include 3 incorrect answers, even if the input text contains fewer or more.
+            - "sources": an URL to support fact-checking (Wikipedia, Britannica, Google or any other reliable source).
+            
+            If the input text is not in ${language}, translate the questions and answers into ${language}.
+            
+            Return a JSON object that matches the 'create_questions' schema. Do not include anything except the JSON.
+            
+            Input text:
+            ${boilerplateText}
+          `,
+        },
+      ],
+      functions: [this.getCreateQuestionsFunctionSignature("parse_questions", type)],
+      function_call: { name: "parse_questions" },
+      temperature: 0,
+    });
+
+    return response;
   }
 
   /**
