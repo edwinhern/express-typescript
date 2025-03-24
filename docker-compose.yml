@@ -7,7 +7,7 @@ services:
     restart: always
     ports:
       - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes", "--replicaof", "no", "one"]
     volumes:
       - redis_data:/data
 
