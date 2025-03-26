@@ -181,10 +181,8 @@ export class QuestionService {
     try {
       const { category: categoryId, prompt, requiredLanguages } = generateQuestionsDto;
       const { questions, totalTokensUsed, completionTokensUsed } =
-        await openaiService.generateQuestionsV2(generateQuestionsDto);
-
-      // const categoryModel = await this.findOrCreateCategory(category);
-      // const categoryModelId = categoryModel._id;
+        // await openaiService.generateQuestionsV2(generateQuestionsDto);
+        await openaiService.generateQuestionsV3(generateQuestionsDto);
 
       const questionsIds: string[] = questions.map((question) => question.id);
       questions.forEach(async (question) => {

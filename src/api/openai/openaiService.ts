@@ -1,7 +1,7 @@
 import { ServiceResponse } from "@/common/models/serviceResponse";
+import { redisClient } from "@/common/utils/redisClient";
 import { logger } from "@/server";
 import OpenAI from "openai";
-// import { questionService } from "../question/questionService";
 import { v4 as uuidv4 } from "uuid";
 import type { GenerateQuestionsOpenAIDto } from "../question/dto/generate-questions-openai.dto";
 import type { GenerateQuestionsDto } from "../question/dto/generate-questions.dto";
@@ -17,41 +17,8 @@ export class OpenAiService {
     });
   }
 
-  async generateQuestionsV2(
-    generateQuestionsDto: GenerateQuestionsDto,
-  ): Promise<{ questions: IQuestion[]; totalTokensUsed: number; completionTokensUsed: number }> {
-    try {
-      const {
-        category: categoryId,
-        type,
-        requiredLanguages: [locale],
-      } = generateQuestionsDto;
-
-      const category = await CategoryModel.findById(categoryId).lean();
-
-      // 1️⃣ Build the prompt based on the question type
-      const prompt = this.buildPrompt({
-        ...generateQuestionsDto,
-        category: category?.name || "",
-      });
-
-      // 2️⃣ Send a request to OpenAI
-      const response = await this.fetchOpenAIResponse(prompt, generateQuestionsDto);
-
-      // 3️⃣ Parse OpenAI's response and return structured questions
-      const parsedQuestions = this.parseOpenAIResponse(response, categoryId, type, locale);
-
-      return parsedQuestions;
-    } catch (error) {
-      logger.error(`Error generating questions: ${(error as Error).message}`);
-      throw new Error("Failed to generate questions.");
-    }
-  }
-
   async parseQuestions(categoryId: number, boilerplateText: string, language = "en", type = "choice" as QuestionType) {
     try {
-      // const category = await CategoryModel.findById(categoryId).lean();
-
       const response = await this.parseQuestionsWithOpenAI(boilerplateText, language, type);
 
       const parsedQuestions = this.parseOpenAIResponse(response, categoryId, type, language);
@@ -77,7 +44,8 @@ export class OpenAiService {
 
     let basePrompt = `Generate ${count} questions based on the prompt: "${prompt}".  
                       Each question must belong to the "${category}" category and be in "${locale}".  
-                      Include reliable sources (Wikipedia, Britannica, or Google Maps).`;
+                      Include reliable sources (Wikipedia, Britannica, or Google Maps).
+                      Do not duplicate questions.`;
 
     if (type === "map") {
       basePrompt += ` Each question must involve identifying a specific location on a map.
@@ -155,55 +123,6 @@ export class OpenAiService {
     return await this.openAi.chat.completions.create({
       model,
       messages: [{ role: "user", content: prompt }],
-      // functions: [
-      //   {
-      //     name: "create_questions",
-      //     description: "Generate structured questions, including map-based questions with coordinates",
-      //     parameters: {
-      //       type: "object",
-      //       properties: {
-      //         questions: {
-      //           type: "array",
-      //           items: {
-      //             type: "object",
-      //             properties: {
-      //               language: { type: "string", description: "Language of the question" },
-      //               question: { type: "string", description: "The question text" },
-      //               correct:
-      //                 type === "map"
-      //                   ? {
-      //                       type: "array",
-      //                       items: { type: "number" },
-      //                       minItems: 2,
-      //                       maxItems: 2,
-      //                       description: "Latitude and longitude coordinates for the correct location",
-      //                     }
-      //                   : { type: "string", description: "The correct answer" },
-      //               wrong:
-      //                 type === "map"
-      //                   ? undefined
-      //                   : {
-      //                       type: "array",
-      //                       items: { type: "string" },
-      //                       description: "List of incorrect answers",
-      //                     },
-      //               sources: {
-      //                 type: "array",
-      //                 items: { type: "string" },
-      //                 description: "URLs for fact-checking (Wikipedia, Britannica, Google Maps)",
-      //               },
-      //             },
-      //             required:
-      //               type === "map"
-      //                 ? ["language", "question", "correct", "sources"]
-      //                 : ["language", "question", "correct", "wrong", "sources"],
-      //           },
-      //         },
-      //       },
-      //       required: ["questions"],
-      //     },
-      //   },
-      // ],
       functions: [this.getCreateQuestionsFunctionSignature("create_questions", type)],
       function_call: { name: "create_questions" },
       temperature,
@@ -398,6 +317,224 @@ export class OpenAiService {
     } catch (error) {
       logger.error(`Error validating translation: ${(error as Error).message}`);
       throw new Error("Failed to validate translation.");
+    }
+  }
+
+  async generateQuestionsV2(
+    generateQuestionsDto: GenerateQuestionsDto,
+  ): Promise<{ questions: IQuestion[]; totalTokensUsed: number; completionTokensUsed: number }> {
+    try {
+      const {
+        category: categoryId,
+        type,
+        requiredLanguages: [locale],
+      } = generateQuestionsDto;
+
+      const category = await CategoryModel.findById(categoryId).lean();
+
+      // 1️⃣ Build the prompt based on the question type
+      const prompt = this.buildPrompt({
+        ...generateQuestionsDto,
+        category: category?.name || "",
+      });
+
+      // 2️⃣ Send a request to OpenAI
+      const response = await this.fetchOpenAIResponse(prompt, generateQuestionsDto);
+
+      // 3️⃣ Parse OpenAI's response and return structured questions
+      const parsedQuestions = this.parseOpenAIResponse(response, categoryId, type, locale);
+
+      return parsedQuestions;
+    } catch (error) {
+      logger.error(`Error generating questions: ${(error as Error).message}`);
+      throw new Error("Failed to generate questions.");
+    }
+  }
+
+  async generateQuestionsV3(generateQuestionsDto: GenerateQuestionsDto): Promise<{
+    questions: IQuestion[];
+    totalTokensUsed: number;
+    completionTokensUsed: number;
+  }> {
+    try {
+      const {
+        category: categoryId,
+        type,
+        model,
+        requiredLanguages: [locale],
+      } = generateQuestionsDto;
+
+      const category = await CategoryModel.findById(categoryId).lean();
+
+      // 1️⃣ Find in cache data about the previous request to OpenAI by category ID
+      const cacheKey = `openai:response:${categoryId}`;
+      const cachedResponse = await redisClient.get(cacheKey);
+
+      let previous_response_id = null;
+
+      if (cachedResponse) {
+        const cacheObject = JSON.parse(cachedResponse);
+        const { response_id, total_tokens } = cacheObject;
+
+        if (total_tokens < 128000) {
+          previous_response_id = response_id;
+        } else {
+          logger.info(`Category ${categoryId} has reached the token limit. Generating a new set of questions.`);
+          await redisClient.del(cacheKey);
+        }
+      }
+
+      // 2️⃣ Build the prompt based on the question type
+      const prompt = this.buildPrompt({
+        ...generateQuestionsDto,
+        category: category?.name || "",
+      });
+
+      const response = await this.openAi.responses.create({
+        model,
+        previous_response_id,
+        input: [
+          ...(previous_response_id
+            ? []
+            : [
+                {
+                  role: "system" as const,
+                  content: `You are a question generator. Your task is to create structured questions based on the given prompt. This is rules:
+                      1. Each question must belong to the "${category?.name}" category and be in "${locale}".
+                      2. Include reliable sources (Wikipedia, Britannica, or Google Maps) for each question.
+                      3. Do not duplicate questions.
+                      4. If the question is a map-based question, the correct answer should be a pair of coordinates [latitude, longitude].
+                      5. If the question is a choice question, include 3 incorrect answers.
+                      6. If the input text is not in ${locale}, translate the questions and answers into ${locale}.`,
+                },
+              ]),
+          {
+            role: "user" as const,
+            content: prompt,
+          },
+        ],
+        tools: [
+          {
+            type: "web_search_preview",
+            user_location: {
+              type: "approximate",
+              country: "UA", //TODO: Must be changable
+              city: "Kyiv", //TODO: Must be changable
+            },
+            search_context_size: "medium", //TODO: can be changed
+          },
+        ],
+        text: {
+          format: {
+            type: "json_schema",
+            name: "create_questions",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                questions: {
+                  type: "array",
+                  description: `A list of structured ${type === "map" ? "map-based" : "choice"} questions`,
+                  items: {
+                    type: "object",
+                    properties: {
+                      language: {
+                        type: "string",
+                        description: "Language of the question (en, ua or etc)",
+                      },
+                      question: {
+                        type: "string",
+                        description: "Question text",
+                      },
+                      correct:
+                        type === "map"
+                          ? {
+                              type: "array",
+                              items: { type: "number" },
+                              // minItems: 2,
+                              // maxItems: 2,
+                              description: "Latitude and longitude coordinates (array of 2 numbers)",
+                            }
+                          : {
+                              type: "string",
+                              description: "Correct answer",
+                            },
+                      ...(type === "map"
+                        ? {}
+                        : {
+                            wrong: {
+                              type: "array",
+                              description: "List of incorrect answers (3 items)",
+                              items: {
+                                type: "string",
+                              },
+                            },
+                          }),
+                      source: {
+                        type: "string",
+                        description: "Link to the source (eg wikipedia, britannica, reuters or other)",
+                      },
+                    },
+                    required:
+                      type === "map"
+                        ? ["language", "question", "correct", "source"]
+                        : ["language", "question", "correct", "wrong", "source"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ["questions"],
+              additionalProperties: false,
+            },
+          },
+        },
+        reasoning: {},
+        tool_choice: "required",
+        temperature: 1,
+        max_output_tokens: 2048,
+        top_p: 1,
+        store: true,
+      });
+
+      // 3️⃣ Save the response ID to cache
+      await redisClient.set(
+        cacheKey,
+        JSON.stringify({ response_id: response.id, total_tokens: response.usage?.total_tokens }),
+      );
+
+      const { output_text } = response;
+
+      const parsedQuestions = JSON.parse(output_text).questions;
+
+      return {
+        questions: parsedQuestions.map((question: any) => ({
+          id: uuidv4(),
+          categoryId,
+          status: "pending",
+          type,
+          difficulty: 3,
+          requiredLanguages: [locale],
+          tags: [],
+          locales: [
+            {
+              ...question,
+              isValid: false,
+            },
+          ],
+          isValid: false,
+        })),
+        totalTokensUsed: response.usage?.total_tokens || 0,
+        completionTokensUsed: response.usage?.output_tokens || 0,
+      };
+    } catch (error) {
+      logger.error(`Error generating questions: ${(error as Error).message}`);
+      const cacheKey = `openai:response:${generateQuestionsDto.category}`;
+      if (await redisClient.exists(cacheKey)) {
+        await redisClient.del(cacheKey);
+        logger.info(`Deleted cache for category ${generateQuestionsDto.category}.`);
+      }
+
+      throw new Error("Failed to generate questions.");
     }
   }
 }

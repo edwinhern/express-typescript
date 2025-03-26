@@ -39,7 +39,7 @@
     "mongoose": "^8.10.0",
     "mongoose-old": "npm:mongoose@^5.13.14",
     "mongoose-sequence": "^6.0.1",
-    "openai": "^4.84.0",
+    "openai": "^4.87.3",
     "pino": "^9.4.0",
     "pino-http": "^10.0.0",
     "redis": "^4.7.0",
