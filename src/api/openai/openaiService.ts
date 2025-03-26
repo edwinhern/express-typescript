@@ -191,7 +191,7 @@ export class OpenAiService {
       questions: functionArgs.questions.map((question: any) => ({
         id: uuidv4(),
         categoryId: category,
-        status: "pending",
+        status: "generated",
         type,
         difficulty: 3,
         requiredLanguages: [locale],

@@ -276,13 +276,15 @@ export class QuestionService {
       );
 
       const questionsIds: string[] = questions.map((question) => question.id);
-      questions.forEach(async (question) => {
-        question.requiredLanguages = [language];
-        question.categoryId = categoryId;
-        question.createdAt = new Date();
-        question.updatedAt = new Date();
-        await redisClient.set(`question:${question.id}`, JSON.stringify(question), { EX: GENERATED_QUESTION_TTL });
-      });
+      // questions.forEach(async (question) => {
+      //   question.requiredLanguages = [language];
+      //   question.categoryId = categoryId;
+      //   question.createdAt = new Date();
+      //   question.updatedAt = new Date();
+      //   await redisClient.set(`question:${question.id}`, JSON.stringify(question), { EX: GENERATED_QUESTION_TTL });
+      // });
+
+      await QuestionModel.bulkSave(questions.map((q) => new QuestionModel(q)));
 
       await statsService.logQuestionGeneration(categoryId, questionsIds, totalTokensUsed, boilerplateText);
 
