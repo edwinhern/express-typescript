@@ -36,7 +36,7 @@ export class QuestionService {
         locales: { $elemMatch: { question: { $regex: title || "", $options: "i" } } },
         difficulty: difficulty ? { $eq: difficulty } : { $exists: true },
         type: type ? { $eq: type } : { $exists: true },
-        status: status ? { $eq: status } : { $exists: true },
+        status: status && status !== "generated" ? { $eq: status } : { $ne: "generated" },
       })
         .sort({ createdAt: -1 }) // Сортировка по createdAt (новые сначала)
         .limit(validLimit)
@@ -95,47 +95,86 @@ export class QuestionService {
       questions: IQuestion[];
       questionsCount: number;
       totalPages: number;
-    }>
+    } | null>
   > {
-    // Получаем все ключи вопросов
-    const questionKeys = await redisClient.keys("question:*");
+    //#region Deprecated Redis implementation
+    // // Получаем все ключи вопросов
+    // const questionKeys = await redisClient.keys("question:*");
 
-    const questionsCount = questionKeys.length;
-    const totalPages = Math.ceil(questionsCount / limit);
+    // const questionsCount = questionKeys.length;
+    // const totalPages = Math.ceil(questionsCount / limit);
 
-    // Разбиваем на страницы
-    const slicedKeys = questionKeys.slice((page - 1) * limit, page * limit);
+    // // Разбиваем на страницы
+    // const slicedKeys = questionKeys.slice((page - 1) * limit, page * limit);
 
-    // Загружаем вопросы из Redis
-    const questionsData = await Promise.all(
-      slicedKeys.map(async (key) => {
-        const data = await redisClient.get(key);
-        return data ? JSON.parse(data) : null;
-      }),
-    );
+    // // Загружаем вопросы из Redis
+    // const questionsData = await Promise.all(
+    //   slicedKeys.map(async (key) => {
+    //     const data = await redisClient.get(key);
+    //     return data ? JSON.parse(data) : null;
+    //   }),
+    // );
 
-    // Фильтруем null (если вдруг какой-то ключ был, но данные не загрузились)
-    const questions = questionsData.filter((q) => q !== null) as IQuestion[];
+    // // Фильтруем null (если вдруг какой-то ключ был, но данные не загрузились)
+    // const questions = questionsData.filter((q) => q !== null) as IQuestion[];
 
-    return ServiceResponse.success<{
-      questions: IQuestion[];
-      questionsCount: number;
-      totalPages: number;
-    }>("Questions found", {
-      questions,
-      questionsCount,
-      totalPages,
-    });
+    // return ServiceResponse.success<{
+    //   questions: IQuestion[];
+    //   questionsCount: number;
+    //   totalPages: number;
+    // }>("Questions found", {
+    //   questions,
+    //   questionsCount,
+    //   totalPages,
+    // });
+    //#endregion
+
+    try {
+      // Проверяем корректность входных параметров
+      const validLimit = !limit || limit <= 0 || Number.isNaN(Number(limit)) ? 10 : limit;
+      const validPage = !page || page <= 0 || Number.isNaN(Number(page)) ? 1 : page;
+
+      const [questions, questionsCount] = await Promise.all([
+        QuestionModel.find({ status: "generated" })
+          .sort({ createdAt: -1 }) // Сортировка по createdAt (новые сначала)
+          .limit(validLimit)
+          .skip((validPage - 1) * validLimit)
+          .lean(),
+        QuestionModel.countDocuments({ status: "generated" }),
+      ]);
+
+      // Рассчитываем totalPages
+      const totalPages = questionsCount > 0 ? Math.ceil(questionsCount / validLimit) : 1;
+
+      return ServiceResponse.success<{
+        questions: IQuestion[];
+        questionsCount: number;
+        totalPages: number;
+      }>("Questions found", {
+        questions,
+        questionsCount,
+        totalPages,
+      });
+    } catch (error) {
+      logger.error(`Error getting generated questions: ${error as Error}`);
+      return ServiceResponse.failure(
+        error instanceof Error ? error.message : "Failed to get generated questions",
+        null,
+        StatusCodes.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
-
   async getGeneratedQuestion(questionId: string): Promise<ServiceResponse<IQuestion | null>> {
-    const question = await redisClient.get(`question:${questionId}`);
+    const question = await QuestionModel.findOne({
+      _id: questionId,
+      status: "generated",
+    }).lean();
 
     if (!question) {
       return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
     }
 
-    return ServiceResponse.success("Question found", JSON.parse(question));
+    return ServiceResponse.success("Question found", question);
   }
 
   async saveQuestions(questions: IQuestion[], categoryId: mongoose.Types.ObjectId) {
@@ -185,13 +224,15 @@ export class QuestionService {
         await openaiService.generateQuestionsV3(generateQuestionsDto);
 
       const questionsIds: string[] = questions.map((question) => question.id);
-      questions.forEach(async (question) => {
-        question.requiredLanguages = requiredLanguages;
-        question.categoryId = categoryId;
-        question.createdAt = new Date();
-        question.updatedAt = new Date();
-        await redisClient.set(`question:${question.id}`, JSON.stringify(question), { EX: GENERATED_QUESTION_TTL });
-      });
+      // questions.forEach(async (question) => {
+      //   question.requiredLanguages = requiredLanguages;
+      //   question.categoryId = categoryId;
+      //   question.createdAt = new Date();
+      //   question.updatedAt = new Date();
+      //   await redisClient.set(`question:${question.id}`, JSON.stringify(question), { EX: GENERATED_QUESTION_TTL });
+      // });
+
+      await QuestionModel.bulkSave(questions.map((q) => new QuestionModel(q)));
 
       await statsService.logQuestionGeneration(categoryId, questionsIds, totalTokensUsed, prompt);
 
@@ -281,27 +322,48 @@ export class QuestionService {
     return this.updateQuestionValidationStatus(questionId, true);
   }
 
+  // async rejectGeneratedQuestions(questionIds: string[]) {
+  //   try {
+  //     const redisKeys = questionIds.map((id) => `question:${id}`);
+  //     const questionsData = await redisClient.mGet(redisKeys); // Получаем все вопросы одним запросом
+
+  //     // Фильтруем отсутствующие вопросы и парсим JSON
+  //     const validQuestions = questionsData
+  //       .map((data, index) => (data ? { id: questionIds[index], ...JSON.parse(data) } : null))
+  //       .filter((q) => q !== null) as Array<{ id: string }>;
+
+  //     if (validQuestions.length === 0) {
+  //       return ServiceResponse.failure("No valid questions found", null, StatusCodes.NOT_FOUND);
+  //     }
+
+  //     // Удаляем отклоненные вопросы из Redis
+  //     await redisClient.del(redisKeys);
+
+  //     return ServiceResponse.success<IQuestion[]>(
+  //       "Questions rejected",
+  //       validQuestions.map((q) => q as IQuestion),
+  //     );
+  //   } catch (error) {
+  //     console.error("Error rejecting questions:", error);
+  //     return ServiceResponse.failure("Internal Server Error", null, StatusCodes.INTERNAL_SERVER_ERROR);
+  //   }
+  // }
+
   async rejectGeneratedQuestions(questionIds: string[]) {
     try {
-      const redisKeys = questionIds.map((id) => `question:${id}`);
-      const questionsData = await redisClient.mGet(redisKeys); // Получаем все вопросы одним запросом
+      // Удаляем только те вопросы, которые находятся в статусе "generated"
+      const deleteResult = await QuestionModel.deleteMany({
+        _id: { $in: questionIds },
+        status: "generated",
+      });
 
-      // Фильтруем отсутствующие вопросы и парсим JSON
-      const validQuestions = questionsData
-        .map((data, index) => (data ? { id: questionIds[index], ...JSON.parse(data) } : null))
-        .filter((q) => q !== null) as Array<{ id: string }>;
-
-      if (validQuestions.length === 0) {
-        return ServiceResponse.failure("No valid questions found", null, StatusCodes.NOT_FOUND);
+      if (deleteResult.deletedCount === 0) {
+        return ServiceResponse.failure("No generated questions found to delete", null, StatusCodes.NOT_FOUND);
       }
 
-      // Удаляем отклоненные вопросы из Redis
-      await redisClient.del(redisKeys);
-
-      return ServiceResponse.success<IQuestion[]>(
-        "Questions rejected",
-        validQuestions.map((q) => q as IQuestion),
-      );
+      return ServiceResponse.success("Generated questions rejected and deleted", {
+        deletedCount: deleteResult.deletedCount,
+      });
     } catch (error) {
       console.error("Error rejecting questions:", error);
       return ServiceResponse.failure("Internal Server Error", null, StatusCodes.INTERNAL_SERVER_ERROR);
@@ -312,7 +374,9 @@ export class QuestionService {
     try {
       const result = await this.rejectGeneratedQuestions([questionId]);
       return result.success
-        ? ServiceResponse.success<IQuestion>("Question rejected", result.responseObject![0])
+        ? ServiceResponse.success<{
+            deletedCount: number;
+          }>("Question rejected", { deletedCount: result.responseObject?.deletedCount ?? 0 })
         : ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
     } catch (error) {
       console.error("Error rejecting question:", error);
@@ -350,37 +414,97 @@ export class QuestionService {
     return ServiceResponse.success<IQuestion>("Question translation deleted", question);
   }
 
+  // async confirmGeneratedQuestions(questionIds: string[]) {
+  //   try {
+  //     const redisKeys = questionIds.map((id) => `question:${id}`);
+  //     const questionsData = await redisClient.mGet(redisKeys); // Fetch all questions from Redis
+
+  //     // Filter out missing questions and parse JSON
+  //     const validQuestions = questionsData
+  //       .map((data, index) => (data ? { id: questionIds[index], ...JSON.parse(data) } : null))
+  //       .filter((q) => q !== null) as Array<{ id: string; categoryId: string; requiredLanguages: string[] }>;
+
+  //     if (validQuestions.length === 0) {
+  //       return ServiceResponse.failure("No valid questions found", null, StatusCodes.NOT_FOUND);
+  //     }
+
+  //     // Save questions to the database
+  //     const savedQuestions = await QuestionModel.insertMany(validQuestions);
+
+  //     // Remove confirmed questions from Redis
+  //     await redisClient.del(redisKeys);
+
+  //     // Update question status to "approved"
+  //     await QuestionModel.updateMany({ _id: { $in: savedQuestions.map((q) => q._id) } }, { status: "generated" });
+
+  //     // List of target languages for translation
+  //     const requiredLocales = ["ru", "uk", "en-US", "es", "fr", "de", "it", "pl", "tr"];
+
+  //     // Perform translation for each question
+  //     const translationPromises = savedQuestions.flatMap((question) =>
+  //       requiredLocales.map(async (language) => {
+  //         const translationResponse = await translationService.translateQuestion(
+  //           question.toJSON()._id.toString(),
+  //           language as TargetLanguageCode,
+  //         );
+
+  //         if (translationResponse.success && translationResponse.responseObject) {
+  //           await QuestionModel.updateOne(
+  //             { _id: question._id, "locales.language": language },
+  //             {
+  //               $set: { "locales.$": translationResponse.responseObject }, // Update existing locale
+  //             },
+  //           ).then((updateResult) => {
+  //             if (updateResult.matchedCount === 0) {
+  //               // If no matching locale was found, add it as a new one
+  //               return QuestionModel.updateOne(
+  //                 { _id: question._id },
+  //                 { $push: { locales: translationResponse.responseObject } },
+  //               );
+  //             }
+  //           });
+  //         }
+  //       }),
+  //     );
+
+  //     await Promise.all(translationPromises);
+
+  //     return ServiceResponse.success<IQuestion[]>(
+  //       "Questions confirmed and translated",
+  //       savedQuestions.map((q) => q.toJSON()),
+  //     );
+  //   } catch (error) {
+  //     console.error("Error confirming questions:", error);
+  //     return ServiceResponse.failure("Internal Server Error", null, StatusCodes.INTERNAL_SERVER_ERROR);
+  //   }
+  // }
+
   async confirmGeneratedQuestions(questionIds: string[]) {
     try {
-      const redisKeys = questionIds.map((id) => `question:${id}`);
-      const questionsData = await redisClient.mGet(redisKeys); // Fetch all questions from Redis
+      // Получаем вопросы из MongoDB, у которых статус "generated"
+      const generatedQuestions = await QuestionModel.find({
+        _id: { $in: questionIds },
+        status: "generated",
+      });
 
-      // Filter out missing questions and parse JSON
-      const validQuestions = questionsData
-        .map((data, index) => (data ? { id: questionIds[index], ...JSON.parse(data) } : null))
-        .filter((q) => q !== null) as Array<{ id: string; categoryId: string; requiredLanguages: string[] }>;
-
-      if (validQuestions.length === 0) {
-        return ServiceResponse.failure("No valid questions found", null, StatusCodes.NOT_FOUND);
+      if (!generatedQuestions.length) {
+        return ServiceResponse.failure("No generated questions found", null, StatusCodes.NOT_FOUND);
       }
 
-      // Save questions to the database
-      const savedQuestions = await QuestionModel.insertMany(validQuestions);
+      // Обновляем статус вопросов на "in_progress"
+      await QuestionModel.updateMany(
+        { _id: { $in: questionIds } },
+        { $set: { status: "in_progress", updatedAt: new Date() } },
+      );
 
-      // Remove confirmed questions from Redis
-      await redisClient.del(redisKeys);
-
-      // Update question status to "approved"
-      await QuestionModel.updateMany({ _id: { $in: savedQuestions.map((q) => q._id) } }, { status: "approved" });
-
-      // List of target languages for translation
+      // Языки, на которые нужно выполнить перевод
       const requiredLocales = ["ru", "uk", "en-US", "es", "fr", "de", "it", "pl", "tr"];
 
-      // Perform translation for each question
-      const translationPromises = savedQuestions.flatMap((question) =>
+      // Переводим вопросы
+      const translationPromises = generatedQuestions.flatMap((question) =>
         requiredLocales.map(async (language) => {
           const translationResponse = await translationService.translateQuestion(
-            question.toJSON()._id.toString(),
+            question._id!.toString(),
             language as TargetLanguageCode,
           );
 
@@ -388,11 +512,10 @@ export class QuestionService {
             await QuestionModel.updateOne(
               { _id: question._id, "locales.language": language },
               {
-                $set: { "locales.$": translationResponse.responseObject }, // Update existing locale
+                $set: { "locales.$": translationResponse.responseObject },
               },
             ).then((updateResult) => {
               if (updateResult.matchedCount === 0) {
-                // If no matching locale was found, add it as a new one
                 return QuestionModel.updateOne(
                   { _id: question._id },
                   { $push: { locales: translationResponse.responseObject } },
@@ -405,9 +528,11 @@ export class QuestionService {
 
       await Promise.all(translationPromises);
 
+      const updatedQuestions = await QuestionModel.find({ _id: { $in: questionIds } });
+
       return ServiceResponse.success<IQuestion[]>(
         "Questions confirmed and translated",
-        savedQuestions.map((q) => q.toJSON()),
+        updatedQuestions.map((q) => q.toJSON()),
       );
     } catch (error) {
       console.error("Error confirming questions:", error);
@@ -438,15 +563,20 @@ export class QuestionService {
   }
 
   async updateGeneratedQuestion(questionId: string, question: IQuestion) {
-    const updatedQuestion = await redisClient.set(`question:${questionId}`, JSON.stringify(question), {
-      EX: GENERATED_QUESTION_TTL,
-    });
+    const updated = await QuestionModel.findOneAndUpdate(
+      { _id: questionId, status: "generated" },
+      {
+        ...question,
+        updatedAt: new Date(),
+      },
+      { new: true },
+    ).lean();
 
-    if (!updatedQuestion) {
-      return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
+    if (!updated) {
+      return ServiceResponse.failure("Question not found or not in 'generated' status", null, StatusCodes.NOT_FOUND);
     }
 
-    return ServiceResponse.success<IQuestion>("Question updated", question);
+    return ServiceResponse.success<IQuestion>("Question updated", updated);
   }
 
   async confirmQuestion(questionId: string) {

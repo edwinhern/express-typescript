@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { GenerateQuestionsOpenAIDto } from "../question/dto/generate-questions-openai.dto";
 import type { GenerateQuestionsDto } from "../question/dto/generate-questions.dto";
 import { CategoryModel } from "../question/models/category.model";
-import type { ILocaleSchema, IQuestion, QuestionType } from "../question/models/question.model";
+import type { ILocaleSchema, IQuestion, QuestionStatus, QuestionType } from "../question/models/question.model";
 
 export class OpenAiService {
   private openAi: OpenAI;
@@ -496,10 +496,13 @@ export class OpenAiService {
         store: true,
       });
 
+      //EX must be 7 days
+
       // 3️⃣ Save the response ID to cache
       await redisClient.set(
         cacheKey,
         JSON.stringify({ response_id: response.id, total_tokens: response.usage?.total_tokens }),
+        { EX: 604800 }, //TODO: move it to .env
       );
 
       const { output_text } = response;
@@ -510,7 +513,7 @@ export class OpenAiService {
         questions: parsedQuestions.map((question: any) => ({
           id: uuidv4(),
           categoryId,
-          status: "pending",
+          status: "generated" as QuestionStatus,
           type,
           difficulty: 3,
           requiredLanguages: [locale],

@@ -138,10 +138,7 @@ export class TranslationService {
   ): Promise<ServiceResponse<translatedQuestionResponse | null>> {
     try {
       const result = await this.translateQuestionBase(
-        async () => {
-          const question = await redisClient.get(`question:${questionId}`);
-          return question ? JSON.parse(question) : null;
-        },
+        () => QuestionModel.findById(questionId).lean(),
         questionId,
         language,
       );

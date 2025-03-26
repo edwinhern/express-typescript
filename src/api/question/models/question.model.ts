@@ -1,7 +1,7 @@
 import mongoose, { Schema, type Document } from "mongoose";
 import type { ICategory } from "./category.model";
 
-export type QuestionStatus = "proof_reading" | "approved" | "rejected" | "pending" | "in_progress";
+export type QuestionStatus = "generated" | "proof_reading" | "approved" | "rejected" | "pending" | "in_progress";
 
 export interface ILocaleSchema {
   language: string;
@@ -46,7 +46,11 @@ const QuestionSchema = new Schema<IQuestion>(
   {
     categoryId: { type: Number, ref: "Category", required: true },
     mainDbId: { type: Number, required: false },
-    status: { type: String, enum: ["proof_reading", "approved", "rejected", "pending", "in_progress"], required: true },
+    status: {
+      type: String,
+      enum: ["generated", "proof_reading", "approved", "rejected", "pending", "in_progress"],
+      required: true,
+    },
     track: { type: String },
     type: { type: String, enum: Object.values(QuestionType), required: true, default: QuestionType.Choice },
     difficulty: { type: Number, min: 1, max: 5, required: true },

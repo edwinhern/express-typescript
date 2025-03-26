@@ -5,7 +5,7 @@ const AutoIncrementID = require("mongoose-sequence")(mongooseOld);
 
 const { Schema, model, Document, Model } = mongooseOld;
 
-export type QuestionStatus = "proof_reading" | "approved" | "rejected" | "pending" | "in_progress";
+export type QuestionStatus = "generated" | "proof_reading" | "approved" | "rejected" | "pending" | "in_progress";
 
 export interface IOldQuestionLocaleSchema {
   language: string;
@@ -49,7 +49,12 @@ const OldQuestionSchema = new Schema(
   {
     _id: { type: Number },
     categoryId: { type: Number, ref: "Category", required: true },
-    status: { type: String, enum: ["proof_reading", "approved", "rejected", "pending", "in_progress"], required: true },
+    status: {
+      type: String,
+      enum: ["generated", "proof_reading", "approved", "rejected", "pending", "in_progress"],
+      required: true,
+      default: "generated",
+    },
     mainDbId: { type: Number, required: false },
     track: { type: String, required: false },
     type: { type: String, enum: Object.values(QuestionType), required: true, default: QuestionType.Choice },
