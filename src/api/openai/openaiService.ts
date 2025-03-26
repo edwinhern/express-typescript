@@ -31,7 +31,7 @@ export class OpenAiService {
   }
 
   /**
-   * Builds a prompt dynamically based on the question type.
+   * Builds a simplified prompt based on the question type.
    */
   private buildPrompt(generateQuestionsDto: GenerateQuestionsOpenAIDto): string {
     const {
@@ -42,15 +42,14 @@ export class OpenAiService {
       requiredLanguages: [locale],
     } = generateQuestionsDto;
 
-    let basePrompt = `Generate ${count} questions based on the prompt: "${prompt}".  
-                      Each question must belong to the "${category}" category and be in "${locale}".  
-                      Include reliable sources (Wikipedia, Britannica, or Google Maps).
-                      Do not duplicate questions.`;
+    let basePrompt = `Generate ${count} unique ${type === "map" ? "map-based " : ""}questions based on: "${prompt}".  
+Questions should be in "${locale}" and belong to the "${category}" category.  
+Include reliable sources (Wikipedia, Britannica, Google Maps).`;
 
     if (type === "map") {
-      basePrompt += ` Each question must involve identifying a specific location on a map.
-                      The correct answer should be a pair of coordinates [latitude, longitude].
-                      Do not generate incorrect answers.`;
+      basePrompt += `  
+Each question must include [latitude, longitude] as the correct answer.  
+No incorrect options.`;
     }
 
     return basePrompt;
@@ -390,38 +389,47 @@ export class OpenAiService {
         category: category?.name || "",
       });
 
+      const isFirstRequest = previous_response_id === null;
+
+      const input = [
+        ...(!isFirstRequest
+          ? []
+          : [
+              {
+                role: "system" as const,
+                content: `You are a helpful assistant that generates quiz questions based on facts. Rules: generate n questions about the topic that user provides.
+              - question: "What is the largest planet in the Solar System?"
+              - correct: "Jupiter"
+              - wrong: ["Mars", "Venus", "Mercury"]`,
+              },
+              {
+                role: "system" as const,
+                content: `Rules:
+                    1. Never duplicate questions (you can't generate the same question twice - even if the wording is different).
+                    2. Make sure the questions are factually correct.
+                    3. Include the sources you used to generate the questions. It can be Wikipedia, news articles, etc.
+                    4. Make sure the questions are unique and interesting.`,
+              },
+            ]),
+        {
+          role: "user" as const,
+          content: prompt,
+        },
+      ];
+
       const response = await this.openAi.responses.create({
         model,
         previous_response_id,
-        input: [
-          ...(previous_response_id
-            ? []
-            : [
-                {
-                  role: "system" as const,
-                  content: `You are a question generator. Your task is to create structured questions based on the given prompt. This is rules:
-                      1. Each question must belong to the "${category?.name}" category and be in "${locale}".
-                      2. Include reliable sources (Wikipedia, Britannica, or Google Maps) for each question.
-                      3. Do not duplicate questions.
-                      4. If the question is a map-based question, the correct answer should be a pair of coordinates [latitude, longitude].
-                      5. If the question is a choice question, include 3 incorrect answers.
-                      6. If the input text is not in ${locale}, translate the questions and answers into ${locale}.`,
-                },
-              ]),
-          {
-            role: "user" as const,
-            content: prompt,
-          },
-        ],
+        input,
         tools: [
           {
             type: "web_search_preview",
-            user_location: {
-              type: "approximate",
-              country: "UA", //TODO: Must be changable
-              city: "Kyiv", //TODO: Must be changable
-            },
-            search_context_size: "medium", //TODO: can be changed
+            // user_location: {
+            //   type: "approximate",
+            //   country: "UA", //TODO: Must be changable
+            //   city: "Kyiv", //TODO: Must be changable
+            // },
+            search_context_size: "high", //TODO: can be changed
           },
         ],
         text: {
@@ -488,7 +496,10 @@ export class OpenAiService {
             },
           },
         },
-        reasoning: {},
+        // reasoning: {
+        //   effort: "medium",
+        //   // generate_summary: "detailed",
+        // },
         tool_choice: "required",
         temperature: 1,
         max_output_tokens: 2048,

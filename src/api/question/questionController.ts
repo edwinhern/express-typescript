@@ -46,7 +46,9 @@ export class QuestionController {
 
   rejectGeneratedQuestion: RequestHandler = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const serviceResponse: ServiceResponse<IQuestion | null> = await questionService.rejectGeneratedQuestion(id);
+    const serviceResponse: ServiceResponse<{
+      deletedCount: number;
+    } | null> = await questionService.rejectGeneratedQuestion(id);
 
     handleServiceResponse(serviceResponse, res);
   };

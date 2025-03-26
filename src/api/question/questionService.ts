@@ -2,8 +2,7 @@ import { statsService } from "@/api/stats/statsService";
 import { ServiceResponse } from "@/common/models/serviceResponse";
 import { redisClient } from "@/common/utils/redisClient";
 import { logger } from "@/server";
-import * as deepl from "deepl-node";
-import type { SourceLanguageCode, TargetLanguageCode, Translator } from "deepl-node";
+import type { TargetLanguageCode } from "deepl-node";
 import { StatusCodes } from "http-status-codes";
 import type mongoose from "mongoose";
 import { openaiService } from "../openai/openaiService";
@@ -13,8 +12,6 @@ import type { GetQuestionFiltersDto } from "./dto/get-question-filters.dto";
 import { CategoryModel } from "./models/category.model";
 import { OldQuestionModel, type QuestionType } from "./models/question-old.model";
 import { type ILocaleSchema, type IQuestion, QuestionModel, type QuestionStatus } from "./models/question.model";
-
-const GENERATED_QUESTION_TTL = Number(process.env.GENERATED_QUESTION_TTL ?? 604800);
 
 export class QuestionService {
   async getQuestions(getQuestionFiltersDto: GetQuestionFiltersDto): Promise<
@@ -67,26 +64,6 @@ export class QuestionService {
     return ServiceResponse.success("Question found", question);
   }
 
-  // async getGeneratedQuestions( limit: number, page: number) {
-  //   const session = await redisClient.get(`session:${sessionId}`);
-  //   const sessionData = JSON.parse(session!);
-
-  //   const questions = sessionData.questions.slice((page - 1) * limit, page * limit);
-
-  //   const questionsCount = sessionData.questions.length;
-  //   const totalPages = Math.ceil(questionsCount / limit);
-
-  //   return ServiceResponse.success<{
-  //     questions: any[];
-  //     questionsCount: number;
-  //     totalPages: number;
-  //   }>("Questions found", {
-  //     questions,
-  //     questionsCount,
-  //     totalPages,
-  //   });
-  // }
-
   async getGeneratedQuestions(
     limit: number,
     page: number,
@@ -97,38 +74,6 @@ export class QuestionService {
       totalPages: number;
     } | null>
   > {
-    //#region Deprecated Redis implementation
-    // // Получаем все ключи вопросов
-    // const questionKeys = await redisClient.keys("question:*");
-
-    // const questionsCount = questionKeys.length;
-    // const totalPages = Math.ceil(questionsCount / limit);
-
-    // // Разбиваем на страницы
-    // const slicedKeys = questionKeys.slice((page - 1) * limit, page * limit);
-
-    // // Загружаем вопросы из Redis
-    // const questionsData = await Promise.all(
-    //   slicedKeys.map(async (key) => {
-    //     const data = await redisClient.get(key);
-    //     return data ? JSON.parse(data) : null;
-    //   }),
-    // );
-
-    // // Фильтруем null (если вдруг какой-то ключ был, но данные не загрузились)
-    // const questions = questionsData.filter((q) => q !== null) as IQuestion[];
-
-    // return ServiceResponse.success<{
-    //   questions: IQuestion[];
-    //   questionsCount: number;
-    //   totalPages: number;
-    // }>("Questions found", {
-    //   questions,
-    //   questionsCount,
-    //   totalPages,
-    // });
-    //#endregion
-
     try {
       // Проверяем корректность входных параметров
       const validLimit = !limit || limit <= 0 || Number.isNaN(Number(limit)) ? 10 : limit;
@@ -220,17 +165,9 @@ export class QuestionService {
     try {
       const { category: categoryId, prompt, requiredLanguages } = generateQuestionsDto;
       const { questions, totalTokensUsed, completionTokensUsed } =
-        // await openaiService.generateQuestionsV2(generateQuestionsDto);
         await openaiService.generateQuestionsV3(generateQuestionsDto);
 
       const questionsIds: string[] = questions.map((question) => question.id);
-      // questions.forEach(async (question) => {
-      //   question.requiredLanguages = requiredLanguages;
-      //   question.categoryId = categoryId;
-      //   question.createdAt = new Date();
-      //   question.updatedAt = new Date();
-      //   await redisClient.set(`question:${question.id}`, JSON.stringify(question), { EX: GENERATED_QUESTION_TTL });
-      // });
 
       await QuestionModel.bulkSave(questions.map((q) => new QuestionModel(q)));
 
@@ -276,13 +213,6 @@ export class QuestionService {
       );
 
       const questionsIds: string[] = questions.map((question) => question.id);
-      // questions.forEach(async (question) => {
-      //   question.requiredLanguages = [language];
-      //   question.categoryId = categoryId;
-      //   question.createdAt = new Date();
-      //   question.updatedAt = new Date();
-      //   await redisClient.set(`question:${question.id}`, JSON.stringify(question), { EX: GENERATED_QUESTION_TTL });
-      // });
 
       await QuestionModel.bulkSave(questions.map((q) => new QuestionModel(q)));
 
@@ -323,33 +253,6 @@ export class QuestionService {
   async approveQuestion(questionId: string) {
     return this.updateQuestionValidationStatus(questionId, true);
   }
-
-  // async rejectGeneratedQuestions(questionIds: string[]) {
-  //   try {
-  //     const redisKeys = questionIds.map((id) => `question:${id}`);
-  //     const questionsData = await redisClient.mGet(redisKeys); // Получаем все вопросы одним запросом
-
-  //     // Фильтруем отсутствующие вопросы и парсим JSON
-  //     const validQuestions = questionsData
-  //       .map((data, index) => (data ? { id: questionIds[index], ...JSON.parse(data) } : null))
-  //       .filter((q) => q !== null) as Array<{ id: string }>;
-
-  //     if (validQuestions.length === 0) {
-  //       return ServiceResponse.failure("No valid questions found", null, StatusCodes.NOT_FOUND);
-  //     }
-
-  //     // Удаляем отклоненные вопросы из Redis
-  //     await redisClient.del(redisKeys);
-
-  //     return ServiceResponse.success<IQuestion[]>(
-  //       "Questions rejected",
-  //       validQuestions.map((q) => q as IQuestion),
-  //     );
-  //   } catch (error) {
-  //     console.error("Error rejecting questions:", error);
-  //     return ServiceResponse.failure("Internal Server Error", null, StatusCodes.INTERNAL_SERVER_ERROR);
-  //   }
-  // }
 
   async rejectGeneratedQuestions(questionIds: string[]) {
     try {
@@ -415,71 +318,6 @@ export class QuestionService {
 
     return ServiceResponse.success<IQuestion>("Question translation deleted", question);
   }
-
-  // async confirmGeneratedQuestions(questionIds: string[]) {
-  //   try {
-  //     const redisKeys = questionIds.map((id) => `question:${id}`);
-  //     const questionsData = await redisClient.mGet(redisKeys); // Fetch all questions from Redis
-
-  //     // Filter out missing questions and parse JSON
-  //     const validQuestions = questionsData
-  //       .map((data, index) => (data ? { id: questionIds[index], ...JSON.parse(data) } : null))
-  //       .filter((q) => q !== null) as Array<{ id: string; categoryId: string; requiredLanguages: string[] }>;
-
-  //     if (validQuestions.length === 0) {
-  //       return ServiceResponse.failure("No valid questions found", null, StatusCodes.NOT_FOUND);
-  //     }
-
-  //     // Save questions to the database
-  //     const savedQuestions = await QuestionModel.insertMany(validQuestions);
-
-  //     // Remove confirmed questions from Redis
-  //     await redisClient.del(redisKeys);
-
-  //     // Update question status to "approved"
-  //     await QuestionModel.updateMany({ _id: { $in: savedQuestions.map((q) => q._id) } }, { status: "generated" });
-
-  //     // List of target languages for translation
-  //     const requiredLocales = ["ru", "uk", "en-US", "es", "fr", "de", "it", "pl", "tr"];
-
-  //     // Perform translation for each question
-  //     const translationPromises = savedQuestions.flatMap((question) =>
-  //       requiredLocales.map(async (language) => {
-  //         const translationResponse = await translationService.translateQuestion(
-  //           question.toJSON()._id.toString(),
-  //           language as TargetLanguageCode,
-  //         );
-
-  //         if (translationResponse.success && translationResponse.responseObject) {
-  //           await QuestionModel.updateOne(
-  //             { _id: question._id, "locales.language": language },
-  //             {
-  //               $set: { "locales.$": translationResponse.responseObject }, // Update existing locale
-  //             },
-  //           ).then((updateResult) => {
-  //             if (updateResult.matchedCount === 0) {
-  //               // If no matching locale was found, add it as a new one
-  //               return QuestionModel.updateOne(
-  //                 { _id: question._id },
-  //                 { $push: { locales: translationResponse.responseObject } },
-  //               );
-  //             }
-  //           });
-  //         }
-  //       }),
-  //     );
-
-  //     await Promise.all(translationPromises);
-
-  //     return ServiceResponse.success<IQuestion[]>(
-  //       "Questions confirmed and translated",
-  //       savedQuestions.map((q) => q.toJSON()),
-  //     );
-  //   } catch (error) {
-  //     console.error("Error confirming questions:", error);
-  //     return ServiceResponse.failure("Internal Server Error", null, StatusCodes.INTERNAL_SERVER_ERROR);
-  //   }
-  // }
 
   async confirmGeneratedQuestions(questionIds: string[]) {
     try {
