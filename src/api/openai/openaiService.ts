@@ -452,7 +452,7 @@ No incorrect options.`;
                       },
                       question: {
                         type: "string",
-                        description: "Question text",
+                        description: "Question text (max 160 characters, cannot be longer)", //TODO: must be changable
                       },
                       correct:
                         type === "map"
@@ -465,7 +465,7 @@ No incorrect options.`;
                             }
                           : {
                               type: "string",
-                              description: "Correct answer",
+                              description: "Correct answer (max 50 characters, cannot be longer)", //TODO: must be changable
                             },
                       ...(type === "map"
                         ? {}
@@ -475,6 +475,7 @@ No incorrect options.`;
                               description: "List of incorrect answers (3 items)",
                               items: {
                                 type: "string",
+                                description: "Incorrect answer (max 50 characters, cannot be longer)", //TODO: must be changable
                               },
                             },
                           }),
