@@ -529,6 +529,7 @@ No incorrect options.`;
           difficulty: 3,
           requiredLanguages: [locale],
           tags: [],
+          source: question.source,
           locales: [
             {
               ...question,

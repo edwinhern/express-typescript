@@ -43,6 +43,7 @@ const OldLocaleSchema = new Schema({
   correct: { type: Schema.Types.Mixed, required: true },
   wrong: { type: [String], default: [] },
   isValid: { type: Boolean, required: true },
+  source: { type: String, required: false },
 });
 
 const OldQuestionSchema = new Schema(
@@ -66,6 +67,7 @@ const OldQuestionSchema = new Schema(
     tags: { type: [String], required: true },
     locales: { type: [OldLocaleSchema], required: true },
     isValid: { type: Boolean, default: false },
+    source: { type: String, required: false },
   },
   { timestamps: true },
 );

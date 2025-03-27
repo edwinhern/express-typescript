@@ -32,6 +32,7 @@ export interface IQuestion extends Document {
   isValid: boolean;
   createdAt: Date;
   updatedAt: Date;
+  source?: string;
 }
 
 const LocaleSchema = new Schema<ILocaleSchema>({
@@ -61,6 +62,7 @@ const QuestionSchema = new Schema<IQuestion>(
     tags: { type: [String], required: true },
     locales: { type: [LocaleSchema], required: true },
     isValid: { type: Boolean, default: false },
+    source: { type: String },
   },
   { timestamps: true },
 );
