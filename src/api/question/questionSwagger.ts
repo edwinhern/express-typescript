@@ -389,3 +389,29 @@ questionRegistry.registerPath({
   responses: createApiResponse(z.object({}), "Success"),
   security: [{ BearerAuth: [] }],
 });
+
+questionRegistry.registerPath({
+  method: "post",
+  path: "/questions/history/validate-correctness/{questionId}",
+  tags: ["Questions (History)"],
+  request: {
+    params: z.object({
+      questionId: z.string().min(1, { message: "Question ID is required" }),
+    }),
+  },
+  responses: createApiResponse(z.object({}), "Success"),
+  security: [{ BearerAuth: [] }],
+});
+
+questionRegistry.registerPath({
+  method: "post",
+  path: "/questions/generated/validate-correctness/{questionId}",
+  tags: ["Questions (Generated)"],
+  request: {
+    params: z.object({
+      questionId: z.string().min(1, { message: "Question ID is required" }),
+    }),
+  },
+  responses: createApiResponse(z.object({}), "Success"),
+  security: [{ BearerAuth: [] }],
+});

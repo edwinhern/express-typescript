@@ -546,13 +546,66 @@ export class QuestionService {
 
   async validateGeneratedTranslation(questionId: string, originalLanguage: string, targetLanguage: string) {
     try {
-      const question = await redisClient.get(`question:${questionId}`);
-      const parsedQuestion = question ? (JSON.parse(question) as IQuestion) : null;
-      return this.validateTranslationBase(parsedQuestion, originalLanguage, targetLanguage);
+      const question = await QuestionModel.findOne({ _id: questionId, status: "generated" });
+      return this.validateTranslationBase(question, originalLanguage, targetLanguage);
     } catch (error) {
       logger.error(`Error validating translation: ${error as Error}`);
       return ServiceResponse.failure(
         error instanceof Error ? error.message : "Failed to validate translation",
+        null,
+        StatusCodes.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async validateGeneratedQuestionCorrectness(questionId: string): Promise<ServiceResponse<any>> {
+    try {
+      const question = await QuestionModel.findOne({ _id: questionId, status: "generated" });
+
+      if (!question) {
+        return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
+      }
+
+      const { isValid, suggestion, totalTokensUsed, completionTokensUsed } =
+        await openaiService.validateQuestionCorrectness(question);
+
+      return ServiceResponse.success("Question validated", {
+        isValid,
+        suggestion,
+        totalTokensUsed,
+        completionTokensUsed,
+      });
+    } catch (error) {
+      logger.error(`Error validating question correctness: ${error as Error}`);
+      return ServiceResponse.failure(
+        error instanceof Error ? error.message : "Failed to validate question correctness",
+        null,
+        StatusCodes.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async validateQuestionCorrectness(questionId: string) {
+    try {
+      const question = await QuestionModel.findById(questionId);
+
+      if (!question) {
+        return ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
+      }
+
+      const { isValid, suggestion, totalTokensUsed, completionTokensUsed } =
+        await openaiService.validateQuestionCorrectness(question);
+
+      return ServiceResponse.success("Question validated", {
+        isValid,
+        suggestion,
+        totalTokensUsed,
+        completionTokensUsed,
+      });
+    } catch (error) {
+      logger.error(`Error validating question correctness: ${error as Error}`);
+      return ServiceResponse.failure(
+        error instanceof Error ? error.message : "Failed to validate question correctness",
         null,
         StatusCodes.INTERNAL_SERVER_ERROR,
       );

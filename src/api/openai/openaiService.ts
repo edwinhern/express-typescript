@@ -2,6 +2,7 @@ import { ServiceResponse } from "@/common/models/serviceResponse";
 import { redisClient } from "@/common/utils/redisClient";
 import { logger } from "@/server";
 import OpenAI from "openai";
+import type { Tool } from "openai/resources/responses/responses";
 import { v4 as uuidv4 } from "uuid";
 import type { GenerateQuestionsOpenAIDto } from "../question/dto/generate-questions-openai.dto";
 import type { GenerateQuestionsDto } from "../question/dto/generate-questions.dto";
@@ -424,11 +425,6 @@ No incorrect options.`;
         tools: [
           {
             type: "web_search_preview",
-            // user_location: {
-            //   type: "approximate",
-            //   country: "UA", //TODO: Must be changable
-            //   city: "Kyiv", //TODO: Must be changable
-            // },
             search_context_size: "high", //TODO: can be changed
           },
         ],
@@ -551,6 +547,144 @@ No incorrect options.`;
       }
 
       throw new Error("Failed to generate questions.");
+    }
+  }
+
+  async validateQuestionCorrectness(
+    question: IQuestion,
+    model = "gpt-4o",
+  ): Promise<{
+    isValid: boolean;
+    source: string;
+    suggestion: {
+      question: string;
+      correct: string | number[];
+      wrong: string[];
+    };
+    totalTokensUsed: number;
+    completionTokensUsed: number;
+  }> {
+    try {
+      const isMapType = question.type === "map";
+
+      const input = [
+        {
+          role: "system" as const,
+          content: `You are an expert fact-checker. Your job is to determine whether a question is **factually correct**.
+  🟢 If the question is **completely correct**, return **"isValid: true"**. No suggestions are needed.
+  🔴 If there are **errors or better alternatives**, return **"isValid: false"** and suggest corrections.
+  - Need to check the question and the correct answer for correctness.
+  - You can use any sources to check the correctness of the question and the answer and provide them in the "source" field.
+  - If incorrect, provide **one or more alternative answers** in "suggestion".
+  - If correct, **no suggestions are needed**.`,
+        },
+        {
+          role: "user" as const,
+          content: JSON.stringify({
+            question: question.locales[0].question,
+            correct: isMapType ? question.locales[0].correct : question.locales[0].correct,
+            // wrong: isMapType ? undefined : question.locales[0].wrong,
+            ...(!isMapType
+              ? {
+                  wrong: question.locales[0].wrong,
+                }
+              : {}),
+          }),
+        },
+      ];
+
+      const tools: Tool[] = [
+        {
+          type: "web_search_preview",
+          search_context_size: "high",
+        },
+      ];
+
+      const response = await this.openAi.responses.create({
+        model,
+        input,
+        tools,
+        text: {
+          format: {
+            type: "json_schema",
+            name: "validate_question_correctness",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                isValid: {
+                  type: "boolean",
+                  description: "Is the question fully accurate?",
+                },
+                source: {
+                  type: "string",
+                  description: "Link to the source (eg wikipedia, britannica, reuters or other)",
+                },
+                suggestion: {
+                  anyOf: [
+                    {
+                      type: "object",
+                      description:
+                        "Suggested corrections or alternatives for the question if the question is incorrect.",
+                      properties: {
+                        question: {
+                          type: "string",
+                          description: "Suggested alternative for the question text",
+                        },
+                        correct: isMapType
+                          ? {
+                              type: "array",
+                              items: { type: "number" },
+                              description: "Geolocation remains unchanged",
+                            }
+                          : {
+                              type: "string",
+                              description: "Suggested correct answer",
+                            },
+                        wrong: {
+                          type: "array",
+                          items: { type: "string" },
+                          description: "List of suggested incorrect answers (if applicable)",
+                        },
+                      },
+                      required: isMapType ? ["question"] : ["question", "correct", "wrong"],
+                      additionalProperties: false,
+                    },
+                    {
+                      type: "null",
+                      description: "No suggestion provided when the question is correct.",
+                    },
+                  ],
+                },
+              },
+              required: ["isValid", "source", "suggestion"],
+              additionalProperties: false,
+            },
+          },
+        },
+        temperature: 0,
+        max_output_tokens: 2048,
+        top_p: 1,
+        store: true,
+        tool_choice: "required",
+      });
+
+      const { output_text } = response;
+      const parsedResponse = JSON.parse(output_text);
+      const { isValid, source, suggestion } = parsedResponse;
+      const { usage } = response;
+      const totalTokensUsed = usage?.total_tokens || 0;
+      const completionTokensUsed = usage?.output_tokens || 0;
+      return {
+        isValid,
+        source,
+        suggestion,
+        totalTokensUsed,
+        completionTokensUsed,
+      };
+    } catch (error) {
+      logger.error(`Error validating question correctness: ${(error as Error).message}`);
+      throw new Error("Failed to validate question correctness.");
     }
   }
 }

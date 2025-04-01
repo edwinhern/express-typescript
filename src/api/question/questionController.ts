@@ -198,6 +198,20 @@ export class QuestionController {
 
     handleServiceResponse(serviceResponse, res);
   };
+
+  validateGeneratedQuestionCorrectness: RequestHandler = async (req: Request, res: Response) => {
+    const { questionId } = req.params;
+
+    const serviceResponse = await questionService.validateGeneratedQuestionCorrectness(questionId);
+    handleServiceResponse(serviceResponse, res);
+  };
+
+  validateQuestionCorrectness: RequestHandler = async (req: Request, res: Response) => {
+    const { questionId } = req.params;
+
+    const serviceResponse = await questionService.validateQuestionCorrectness(questionId);
+    handleServiceResponse(serviceResponse, res);
+  };
 }
 
 export const questionController = new QuestionController();

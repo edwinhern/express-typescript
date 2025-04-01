@@ -219,10 +219,36 @@ questionRouter.post(
 );
 
 questionRouter.post(
+  "/history/validate-correctness/:questionId",
+  accessTokenGuard,
+  validateRequest(
+    z.object({
+      params: z.object({
+        questionId: z.string().min(1, { message: "Question ID is required" }),
+      }),
+    }),
+  ),
+  questionController.validateQuestionCorrectness,
+);
+
+questionRouter.post(
   "/generated/validate-translation/:questionId",
   accessTokenGuard,
   validateRequest(validateTranslationRequest),
   questionController.validateGeneratedTranslation,
+);
+
+questionRouter.post(
+  "/generated/validate-correctness/:questionId",
+  accessTokenGuard,
+  validateRequest(
+    z.object({
+      params: z.object({
+        questionId: z.string().min(1, { message: "Question ID is required" }),
+      }),
+    }),
+  ),
+  questionController.validateGeneratedQuestionCorrectness,
 );
 
 //#endregion
