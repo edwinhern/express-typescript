@@ -17,6 +17,12 @@ export class CategoryController {
 
     handleServiceResponse(response, res);
   };
+
+  clearCache: RequestHandler = async (req: Request, res: Response) => {
+    const { categoryId } = req.params;
+    const response: ServiceResponse<null> = await categoryService.clearCache(categoryId);
+    handleServiceResponse(response, res);
+  };
 }
 
 export const categoryController = new CategoryController();

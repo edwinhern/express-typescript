@@ -1,4 +1,5 @@
 import { ServiceResponse } from "@/common/models/serviceResponse";
+import { redisClient } from "@/common/utils/redisClient";
 import { logger } from "@/server";
 import { StatusCodes } from "http-status-codes";
 import { CategoryModel as CategoryModelNew, type ICategory } from "../question/models/category.model";
@@ -78,6 +79,21 @@ export class CategoryService {
       logger.error("❌ Error during category sync:", error);
 
       return ServiceResponse.failure("Error during category sync.", null, 500);
+    }
+  }
+
+  async clearCache(categoryId: string): Promise<ServiceResponse<null>> {
+    try {
+      const cacheKey = `openai:response:${categoryId}`;
+      logger.info(`🗑️ Clearing cache for category ID: ${categoryId}`);
+
+      await redisClient.del(cacheKey);
+
+      logger.info(`✅ Cache cleared for category ID: ${categoryId}`);
+      return ServiceResponse.success("Cache cleared successfully.", null);
+    } catch (error) {
+      logger.error("❌ Error clearing cache:", error);
+      return ServiceResponse.failure("Error clearing cache.", null, 500);
     }
   }
 }

@@ -44,3 +44,25 @@ categoryRegistry.registerPath({
 });
 
 categoryRouter.post("/sync", accessTokenGuard, categoryController.syncCategories);
+
+categoryRegistry.registerPath({
+  method: "delete",
+  path: "/categories/:categoryId/clear-cache",
+  tags: ["Categories"],
+  summary: "Clear cache for category",
+  description: "Clear cache for category",
+  responses: createApiResponse(z.object({}), "Success", 200),
+  security: [{ BearerAuth: [] }],
+});
+categoryRouter.delete(
+  "/:categoryId/clear-cache",
+  accessTokenGuard,
+  validateRequest(
+    z.object({
+      params: z.object({
+        categoryId: z.string(),
+      }),
+    }),
+  ),
+  categoryController.clearCache,
+);
