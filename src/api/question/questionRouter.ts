@@ -251,4 +251,30 @@ questionRouter.post(
   questionController.validateGeneratedQuestionCorrectness,
 );
 
+questionRouter.post(
+  "/generated/validate-correctness-batch",
+  accessTokenGuard,
+  validateRequest(
+    z.object({
+      body: z.object({
+        ids: z.array(z.string()),
+      }),
+    }),
+  ),
+  questionController.validateGeneratedQuestionsCorrectness,
+);
+
+questionRouter.post(
+  "/history/validate-correctness-batch",
+  accessTokenGuard,
+  validateRequest(
+    z.object({
+      body: z.object({
+        ids: z.array(z.string()),
+      }),
+    }),
+  ),
+  questionController.validateQuestionsCorrectness,
+);
+
 //#endregion

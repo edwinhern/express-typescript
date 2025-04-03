@@ -558,7 +558,19 @@ export class QuestionService {
     }
   }
 
-  async validateGeneratedQuestionCorrectness(questionId: string): Promise<ServiceResponse<any>> {
+  async validateGeneratedQuestionCorrectness(questionId: string): Promise<
+    ServiceResponse<{
+      isValid: boolean;
+      questionId: string;
+      suggestion: {
+        question: string;
+        correct: string | number[];
+        wrong: string[];
+      };
+      totalTokensUsed: number;
+      completionTokensUsed: number;
+    } | null>
+  > {
     try {
       const question = await QuestionModel.findOne({ _id: questionId, status: "generated" });
 
@@ -570,6 +582,7 @@ export class QuestionService {
         await openaiService.validateQuestionCorrectness(question);
 
       return ServiceResponse.success("Question validated", {
+        questionId: question._id!.toString(),
         isValid,
         suggestion,
         totalTokensUsed,
@@ -579,6 +592,51 @@ export class QuestionService {
       logger.error(`Error validating question correctness: ${error as Error}`);
       return ServiceResponse.failure(
         error instanceof Error ? error.message : "Failed to validate question correctness",
+        null,
+        StatusCodes.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async validateGeneratedQuestionsCorrectness(questionIds: string[]): Promise<
+    ServiceResponse<
+      | {
+          questionId: string;
+          isValid: boolean;
+          suggestion: {
+            question: string;
+            correct: string | number[];
+            wrong: string[];
+          };
+          totalTokensUsed: number;
+          completionTokensUsed: number;
+        }[]
+      | null
+    >
+  > {
+    try {
+      const questions = await QuestionModel.find({ _id: { $in: questionIds }, status: "generated" });
+      if (!questions.length) {
+        return ServiceResponse.failure("No generated questions found", null, StatusCodes.NOT_FOUND);
+      }
+      const results = await Promise.all(
+        questions.map(async (question) => {
+          const { isValid, suggestion, totalTokensUsed, completionTokensUsed } =
+            await openaiService.validateQuestionCorrectness(question);
+          return {
+            questionId: question._id!.toString(),
+            isValid,
+            suggestion,
+            totalTokensUsed,
+            completionTokensUsed,
+          };
+        }),
+      );
+      return ServiceResponse.success("Questions validated", results);
+    } catch (error) {
+      logger.error(`Error validating questions correctness: ${error as Error}`);
+      return ServiceResponse.failure(
+        error instanceof Error ? error.message : "Failed to validate questions correctness",
         null,
         StatusCodes.INTERNAL_SERVER_ERROR,
       );
@@ -606,6 +664,38 @@ export class QuestionService {
       logger.error(`Error validating question correctness: ${error as Error}`);
       return ServiceResponse.failure(
         error instanceof Error ? error.message : "Failed to validate question correctness",
+        null,
+        StatusCodes.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async validateQuestionsCorrectness(questionIds: string[]) {
+    try {
+      const questions = await QuestionModel.find({ _id: { $in: questionIds } });
+
+      if (!questions.length) {
+        return ServiceResponse.failure("No questions found", null, StatusCodes.NOT_FOUND);
+      }
+
+      const results = await Promise.all(
+        questions.map(async (question) => {
+          const { isValid, suggestion, totalTokensUsed, completionTokensUsed } =
+            await openaiService.validateQuestionCorrectness(question);
+          return {
+            isValid,
+            suggestion,
+            totalTokensUsed,
+            completionTokensUsed,
+          };
+        }),
+      );
+
+      return ServiceResponse.success("Questions validated", results);
+    } catch (error) {
+      logger.error(`Error validating questions correctness: ${error as Error}`);
+      return ServiceResponse.failure(
+        error instanceof Error ? error.message : "Failed to validate questions correctness",
         null,
         StatusCodes.INTERNAL_SERVER_ERROR,
       );

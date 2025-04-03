@@ -415,3 +415,41 @@ questionRegistry.registerPath({
   responses: createApiResponse(z.object({}), "Success"),
   security: [{ BearerAuth: [] }],
 });
+
+questionRegistry.registerPath({
+  method: "post",
+  path: "/questions/generated/validate-correctness-batch",
+  tags: ["Questions (Generated)"],
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            ids: z.array(z.string()),
+          }),
+        },
+      },
+    },
+  },
+  responses: createApiResponse(z.object({}), "Success"),
+  security: [{ BearerAuth: [] }],
+});
+
+questionRegistry.registerPath({
+  method: "post",
+  path: "/questions/history/validate-correctness-batch",
+  tags: ["Questions (History)"],
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            ids: z.array(z.string()),
+          }),
+        },
+      },
+    },
+  },
+  responses: createApiResponse(z.object({}), "Success"),
+  security: [{ BearerAuth: [] }],
+});
