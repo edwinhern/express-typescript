@@ -149,6 +149,20 @@ export class TranslationService {
       return ServiceResponse.failure("Failed to translate question", null, StatusCodes.INTERNAL_SERVER_ERROR);
     }
   }
+
+  async translateText(
+    text: string,
+    sourceLanguage: SourceLanguageCode,
+    targetLanguage: TargetLanguageCode,
+  ): Promise<string | null> {
+    try {
+      const translation = await this.deeplClient.translateText(text, "en", targetLanguage);
+      return translation.text;
+    } catch (error) {
+      logger.error(`Error translating text: ${error}`);
+      throw new Error("Failed to translate text");
+    }
+  }
 }
 
 export const translationService = new TranslationService();
