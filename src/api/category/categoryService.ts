@@ -267,6 +267,48 @@ export class CategoryService {
       return ServiceResponse.failure("Error translating category.", null, 500);
     }
   }
+
+  async getCategoriesWithQuestionsCount(): Promise<
+    ServiceResponse<{
+      categories: (ICategory & { questionsCount: number })[];
+      categoriesCount: number;
+    } | null>
+  > {
+    try {
+      logger.info("🔍 Fetching categories with questions count...");
+
+      const categories = await CategoryModelNew.aggregate<ICategory & { questionsCount: number }>([
+        {
+          $lookup: {
+            from: "questions",
+            localField: "_id",
+            foreignField: "categoryId",
+            as: "questions",
+          },
+        },
+        {
+          $addFields: {
+            questionsCount: { $size: "$questions" },
+          },
+        },
+        {
+          $project: {
+            questions: 0,
+            locales: 0, // <-- исключаем locales
+          },
+        },
+      ]);
+
+      const categoriesCount = categories.length;
+
+      logger.info(`✅ Fetched ${categories.length} categories with questions count successfully!`);
+
+      return ServiceResponse.success("Categories fetched successfully.", { categories, categoriesCount });
+    } catch (error) {
+      logger.error(`❌ Error fetching categories with questions count: ${error}`);
+      return ServiceResponse.failure("Failed to fetch categories", null, StatusCodes.INTERNAL_SERVER_ERROR);
+    }
+  }
 }
 
 export const categoryService = new CategoryService();

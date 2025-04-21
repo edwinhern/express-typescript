@@ -55,6 +55,15 @@ export class CategoryController {
 
     handleServiceResponse(response, res);
   }
+
+  async getCategoriesWithQuestionsCount(req: Request, res: Response) {
+    const response: ServiceResponse<{
+      categories: (ICategory & { questionsCount: number })[];
+      categoriesCount: number;
+    } | null> = await categoryService.getCategoriesWithQuestionsCount();
+
+    handleServiceResponse(response, res);
+  }
 }
 
 export const categoryController = new CategoryController();

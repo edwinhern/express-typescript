@@ -453,3 +453,16 @@ questionRegistry.registerPath({
   responses: createApiResponse(z.object({}), "Success"),
   security: [{ BearerAuth: [] }],
 });
+
+questionRegistry.registerPath({
+  method: "post",
+  path: "/questions/generated/check-duplicates/{categoryId}",
+  tags: ["Questions (Generated)"],
+  request: {
+    params: z.object({
+      categoryId: z.string().min(1, { message: "Category ID is required" }),
+    }),
+  },
+  responses: createApiResponse(z.object({}), "Success"),
+  security: [{ BearerAuth: [] }],
+});

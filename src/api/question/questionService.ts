@@ -1,5 +1,6 @@
 import { statsService } from "@/api/stats/statsService";
 import { ServiceResponse } from "@/common/models/serviceResponse";
+import logError from "@/common/utils/logError";
 import { redisClient } from "@/common/utils/redisClient";
 import { logger } from "@/server";
 import type { TargetLanguageCode } from "deepl-node";
@@ -39,7 +40,12 @@ export class QuestionService {
         .limit(validLimit)
         .skip((validPage - 1) * validLimit)
         .lean(),
-      QuestionModel.countDocuments(),
+      QuestionModel.countDocuments({
+        locales: { $elemMatch: { question: { $regex: title || "", $options: "i" } } },
+        difficulty: difficulty ? { $eq: difficulty } : { $exists: true },
+        type: type ? { $eq: type } : { $exists: true },
+        status: status && status !== "generated" ? { $eq: status } : { $ne: "generated" },
+      }),
     ]);
 
     // Рассчитываем totalPages
@@ -101,12 +107,7 @@ export class QuestionService {
         totalPages,
       });
     } catch (error) {
-      logger.error(`Error getting generated questions: ${error as Error}`);
-      return ServiceResponse.failure(
-        error instanceof Error ? error.message : "Failed to get generated questions",
-        null,
-        StatusCodes.INTERNAL_SERVER_ERROR,
-      );
+      return logError(error, "Error getting generated questions");
     }
   }
   async getGeneratedQuestion(questionId: string): Promise<ServiceResponse<IQuestion | null>> {
@@ -183,12 +184,7 @@ export class QuestionService {
         completionTokensUsed,
       });
     } catch (error) {
-      logger.error(`Error generating questions: ${error as Error}`);
-      return ServiceResponse.failure(
-        error instanceof Error ? error.message : "Failed to generate questions",
-        null,
-        StatusCodes.INTERNAL_SERVER_ERROR,
-      );
+      return logError(error, "Error generating questions");
     }
   }
 
@@ -228,12 +224,7 @@ export class QuestionService {
         completionTokensUsed,
       });
     } catch (error) {
-      logger.error(`Error parsing questions: ${error as Error}`);
-      return ServiceResponse.failure(
-        error instanceof Error ? error.message : "Failed to parse questions",
-        null,
-        StatusCodes.INTERNAL_SERVER_ERROR,
-      );
+      return logError(error, "Error parsing questions");
     }
   }
 
@@ -270,8 +261,7 @@ export class QuestionService {
         deletedCount: deleteResult.deletedCount,
       });
     } catch (error) {
-      console.error("Error rejecting questions:", error);
-      return ServiceResponse.failure("Internal Server Error", null, StatusCodes.INTERNAL_SERVER_ERROR);
+      return logError(error, "Error rejecting questions");
     }
   }
 
@@ -284,8 +274,7 @@ export class QuestionService {
           }>("Question rejected", { deletedCount: result.responseObject?.deletedCount ?? 0 })
         : ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
     } catch (error) {
-      console.error("Error rejecting question:", error);
-      return ServiceResponse.failure("Internal Server Error", null, StatusCodes.INTERNAL_SERVER_ERROR);
+      return logError(error, "Error rejecting question");
     }
   }
 
@@ -375,8 +364,7 @@ export class QuestionService {
         updatedQuestions.map((q) => q.toJSON()),
       );
     } catch (error) {
-      console.error("Error confirming questions:", error);
-      return ServiceResponse.failure("Internal Server Error", null, StatusCodes.INTERNAL_SERVER_ERROR);
+      return logError(error, "Error confirming generated questions");
     }
   }
 
@@ -387,8 +375,7 @@ export class QuestionService {
         ? ServiceResponse.success<IQuestion>("Question confirmed", result.responseObject![0])
         : ServiceResponse.failure("Question not found", null, StatusCodes.NOT_FOUND);
     } catch (error) {
-      console.error("Error confirming question:", error);
-      return ServiceResponse.failure("Internal Server Error", null, StatusCodes.INTERNAL_SERVER_ERROR);
+      return logError(error, "Error confirming question");
     }
   }
 
@@ -474,12 +461,7 @@ export class QuestionService {
 
       return ServiceResponse.success<IQuestion>("Question confirmed", question);
     } catch (error) {
-      logger.error(`Error confirming question: ${error as Error}`);
-      return ServiceResponse.failure(
-        error instanceof Error ? error.message : "Failed to confirm question",
-        null,
-        StatusCodes.INTERNAL_SERVER_ERROR,
-      );
+      return logError(error, "Error confirming question");
     }
   }
 
@@ -535,12 +517,7 @@ export class QuestionService {
       const question = await QuestionModel.findById(questionId);
       return this.validateTranslationBase(question?.toObject() ?? null, originalLanguage, targetLanguage);
     } catch (error) {
-      logger.error(`Error validating translation: ${error as Error}`);
-      return ServiceResponse.failure(
-        error instanceof Error ? error.message : "Failed to validate translation",
-        null,
-        StatusCodes.INTERNAL_SERVER_ERROR,
-      );
+      return logError(error, "Error validating translation");
     }
   }
 
@@ -549,12 +526,7 @@ export class QuestionService {
       const question = await QuestionModel.findOne({ _id: questionId, status: "generated" });
       return this.validateTranslationBase(question, originalLanguage, targetLanguage);
     } catch (error) {
-      logger.error(`Error validating translation: ${error as Error}`);
-      return ServiceResponse.failure(
-        error instanceof Error ? error.message : "Failed to validate translation",
-        null,
-        StatusCodes.INTERNAL_SERVER_ERROR,
-      );
+      return logError(error, "Error validating translation");
     }
   }
 
@@ -589,12 +561,7 @@ export class QuestionService {
         completionTokensUsed,
       });
     } catch (error) {
-      logger.error(`Error validating question correctness: ${error as Error}`);
-      return ServiceResponse.failure(
-        error instanceof Error ? error.message : "Failed to validate question correctness",
-        null,
-        StatusCodes.INTERNAL_SERVER_ERROR,
-      );
+      return logError(error, "Error validating question correctness");
     }
   }
 
@@ -634,12 +601,7 @@ export class QuestionService {
       );
       return ServiceResponse.success("Questions validated", results);
     } catch (error) {
-      logger.error(`Error validating questions correctness: ${error as Error}`);
-      return ServiceResponse.failure(
-        error instanceof Error ? error.message : "Failed to validate questions correctness",
-        null,
-        StatusCodes.INTERNAL_SERVER_ERROR,
-      );
+      return logError(error, "Error validating questions correctness");
     }
   }
 
@@ -661,12 +623,7 @@ export class QuestionService {
         completionTokensUsed,
       });
     } catch (error) {
-      logger.error(`Error validating question correctness: ${error as Error}`);
-      return ServiceResponse.failure(
-        error instanceof Error ? error.message : "Failed to validate question correctness",
-        null,
-        StatusCodes.INTERNAL_SERVER_ERROR,
-      );
+      return logError(error, "Error validating question correctness");
     }
   }
 
@@ -693,12 +650,78 @@ export class QuestionService {
 
       return ServiceResponse.success("Questions validated", results);
     } catch (error) {
-      logger.error(`Error validating questions correctness: ${error as Error}`);
-      return ServiceResponse.failure(
-        error instanceof Error ? error.message : "Failed to validate questions correctness",
-        null,
-        StatusCodes.INTERNAL_SERVER_ERROR,
-      );
+      return logError(error, "Error validating questions correctness");
+    }
+  }
+  async checkForDuplicateQuestions(categoryId: string): Promise<
+    ServiceResponse<{
+      duplicates: string[][];
+      questions: IQuestion[];
+    } | null>
+  > {
+    try {
+      const questions = await QuestionModel.find({ categoryId }).lean();
+
+      const duplicatesMap = new Map<string, Set<string>>();
+
+      for (const question of questions) {
+        for (const locale of question.locales) {
+          if (locale.language !== "en") continue;
+
+          const normalized = locale.question.trim().toLowerCase();
+          if (!duplicatesMap.has(normalized)) {
+            duplicatesMap.set(normalized, new Set());
+          }
+          duplicatesMap.get(normalized)!.add(question._id.toString());
+        }
+      }
+
+      const directGroups = Array.from(duplicatesMap.values())
+        .filter((set) => set.size > 1)
+        .map((set) => Array.from(set));
+
+      const semanticDuplicates: string[][] = await openaiService.findSemanticDuplicates(questions as IQuestion[]);
+
+      const combinedMap = new Map<string, Set<string>>();
+
+      for (const group of directGroups) {
+        const main = group[0];
+        if (!combinedMap.has(main)) combinedMap.set(main, new Set());
+        for (const id of group) {
+          combinedMap.get(main)!.add(id);
+        }
+      }
+
+      for (const group of semanticDuplicates) {
+        const matchedQuestions = questions.filter((q) => group.includes(q.locales[0].question));
+        const ids = matchedQuestions.map((q) => q._id.toString());
+
+        if (ids.length > 1) {
+          const main = ids[0];
+          if (!combinedMap.has(main)) combinedMap.set(main, new Set());
+          for (const id of ids) {
+            combinedMap.get(main)!.add(id);
+          }
+        }
+      }
+
+      const result = Array.from(combinedMap.values())
+        .map((set) => Array.from(set))
+        .filter((group) => group.length > 1);
+
+      if (!result.length) {
+        return ServiceResponse.success("No duplicate questions found", {
+          duplicates: [],
+          questions,
+        });
+      }
+
+      return ServiceResponse.success("Duplicate questions found", {
+        duplicates: result,
+        questions,
+      });
+    } catch (error) {
+      return logError(error, "Error checking for duplicate questions");
     }
   }
 }

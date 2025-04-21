@@ -35,6 +35,17 @@ categoryRouter.get(
 
 categoryRegistry.registerPath({
   method: "get",
+  path: "/categories/with-questions-count",
+  tags: ["Categories"],
+  summary: "Get all categories with questions count",
+  description: "Get all categories with questions count",
+  responses: createApiResponse(z.array(z.object({})), "Success", 200),
+  security: [{ BearerAuth: [] }],
+});
+categoryRouter.get("/with-questions-count", accessTokenGuard, categoryController.getCategoriesWithQuestionsCount);
+
+categoryRegistry.registerPath({
+  method: "get",
   path: "/categories/{categoryId}",
   tags: ["Categories"],
   summary: "Get category by ID",

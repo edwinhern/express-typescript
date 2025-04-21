@@ -28,6 +28,10 @@ authRegistry.registerPath({
       content: {
         "application/json": {
           schema: PostAuthSchema.shape.body,
+          example: {
+            username: "root",
+            password: "root_password",
+          },
         },
       },
     },

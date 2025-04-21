@@ -226,6 +226,12 @@ export class QuestionController {
     const serviceResponse = await questionService.validateQuestionsCorrectness(ids);
     handleServiceResponse(serviceResponse, res);
   };
+
+  checkForDuplicateQuestions: RequestHandler = async (req: Request, res: Response) => {
+    const { categoryId } = req.params;
+    const serviceResponse = await questionService.checkForDuplicateQuestions(categoryId);
+    handleServiceResponse(serviceResponse, res);
+  };
 }
 
 export const questionController = new QuestionController();

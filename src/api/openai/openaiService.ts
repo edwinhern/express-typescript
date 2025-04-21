@@ -687,6 +687,64 @@ No incorrect options.`;
       throw new Error("Failed to validate question correctness.");
     }
   }
+  async findSemanticDuplicates(questions: IQuestion[], model = "gpt-4o"): Promise<string[][]> {
+    const functionDef = {
+      name: "mark_duplicates",
+      description: "Find groups of semantically duplicate questions",
+      parameters: {
+        type: "object",
+        properties: {
+          duplicates: {
+            type: "array",
+            description: "Each array inside contains phrases that are semantically equal",
+            items: {
+              type: "array",
+              items: {
+                type: "string",
+              },
+            },
+          },
+        },
+        required: ["duplicates"],
+      },
+    };
+
+    const prompts = questions
+      .map((q, i) => {
+        const firstLocale = q.locales[0];
+        return `Q${i + 1}: (${firstLocale.language}) ${firstLocale.question}`;
+      })
+      .join("\n");
+
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      {
+        role: "system",
+        content: "You are a helpful assistant that groups semantically similar questions written in different ways.",
+      },
+      {
+        role: "user",
+        content: `Below is a list of questions. Some may be duplicates written in different words. Group semantically equivalent questions:\n\n${prompts}`,
+      },
+    ];
+
+    const response = await this.openAi.chat.completions.create({
+      model,
+      messages,
+      tools: [{ type: "function", function: functionDef }],
+      tool_choice: { type: "function", function: { name: "mark_duplicates" } },
+    });
+
+    const functionCall = response.choices[0]?.message.tool_calls?.[0]?.function;
+    if (!functionCall?.arguments) return [];
+
+    try {
+      const args = JSON.parse(functionCall.arguments) as { duplicates: string[][] };
+      return args.duplicates;
+    } catch (err) {
+      console.error("Failed to parse function call arguments", err);
+      return [];
+    }
+  }
 }
 
 export const openaiService = new OpenAiService();

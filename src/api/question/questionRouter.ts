@@ -232,6 +232,19 @@ questionRouter.post(
 );
 
 questionRouter.post(
+  "/generated/check-duplicates/:categoryId",
+  accessTokenGuard,
+  validateRequest(
+    z.object({
+      params: z.object({
+        categoryId: z.string().min(1, { message: "Category ID is required" }),
+      }),
+    }),
+  ),
+  questionController.checkForDuplicateQuestions,
+);
+
+questionRouter.post(
   "/generated/validate-translation/:questionId",
   accessTokenGuard,
   validateRequest(validateTranslationRequest),
