@@ -8,10 +8,10 @@ runs:
       id: versions
       shell: bash
       run: |
-        NODE_VERSION=$(grep 'nodejs' .tool-versions | awk '{print $1}')
         PNPM_VERSION=$(grep 'pnpm' .tool-versions | awk '{print $2}')
-        echo "node=$NODE_VERSION" >> $GITHUB_OUTPUT
+        NODE_VERSION=$(grep 'nodejs' .tool-versions | awk '{print $2}')
         echo "pnpm=$PNPM_VERSION" >> $GITHUB_OUTPUT
+        echo "node=$NODE_VERSION" >> $GITHUB_OUTPUT
 
     - name: Setup pnpm
       uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
