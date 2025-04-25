@@ -9,10 +9,9 @@
 	"private": true,
 	"scripts": {
 		"build": "tsc && tsup",
-		"start:dev": "tsx watch --clear-screen=false src/index.ts | pino-pretty",
+		"start:dev": "node --import=tsx --watch src/index.ts",
 		"start:prod": "node dist/index.js",
-		"lint": "biome lint",
-		"lint:fix": "biome lint --fix",
+		"lint": "biome lint --fix",
 		"format": "biome format --write",
 		"test": "vitest run",
 		"test:cov": "vitest run --coverage",
@@ -22,7 +21,6 @@
 		"@asteasolutions/zod-to-openapi": "7.3.0",
 		"cors": "2.8.5",
 		"dotenv": "16.5.0",
-		"envalid": "8.0.0",
 		"express": "5.1.0",
 		"express-rate-limit": "7.5.0",
 		"helmet": "8.1.0",
@@ -48,10 +46,15 @@
 		"vitest": "3.1.2"
 	},
 	"tsup": {
-		"entry": ["src", "!src/**/__tests__/**", "!src/**/*.test.*"],
-		"splitting": false,
+		"entry": ["src/index.ts"],
+		"outDir": "dist",
+		"format": ["esm", "cjs"],
+		"target": "es2020",
 		"sourcemap": true,
-		"clean": true
+		"clean": true,
+		"dts": true,
+		"splitting": false,
+		"skipNodeModulesBundle": true
 	},
 	"packageManager": "pnpm@10.9.0"
 }

@@ -1,10 +1,10 @@
 {
 	"compilerOptions": {
 		"target": "ESNext",
-		"module": "CommonJS",
-		"baseUrl": ".",
+		"module": "ESNext",
+		"baseUrl": "./src",
 		"paths": {
-			"@/*": ["src/*"]
+			"@/*": ["*"]
 		},
 		"moduleResolution": "Node",
 		"outDir": "dist",

@@ -17,9 +17,6 @@ importers:
       dotenv:
         specifier: 16.5.0
         version: 16.5.0
-      envalid:
-        specifier: 8.0.0
-        version: 8.0.0
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -64,7 +61,7 @@ importers:
         specifier: 3.1.2
         version: 3.1.2(vitest@3.1.2(@types/node@22.15.2)(tsx@4.19.3)(yaml@2.7.1))
       pino-pretty:
-        specifier: 13.0.0
+        specifier: ^13.0.0
         version: 13.0.0
       supertest:
         specifier: 7.1.0
@@ -76,7 +73,7 @@ importers:
         specifier: 4.19.3
         version: 4.19.3
       typescript:
-        specifier: 5.8.3
+        specifier: ^5.8.3
         version: 5.8.3
       vite-tsconfig-paths:
         specifier: 5.1.4
@@ -739,10 +736,6 @@ packages:
   end-of-stream@1.4.4:
     resolution: {integrity: sha512-+uw1inIHVPQoaVuHzRyXd21icM+cnt4CzD5rW+NC1wjOUSTOs+Te7FOv7AhN7vS9x/oIyhLP5PR1H+phQAHu5Q==}
 
-  envalid@8.0.0:
-    resolution: {integrity: sha512-PGeYJnJB5naN0ME6SH8nFcDj9HVbLpYIfg1p5lAyM9T4cH2lwtu2fLbozC/bq+HUUOIFxhX/LP0/GmlqPHT4tQ==}
-    engines: {node: '>=8.12'}
-
   es-define-property@1.0.1:
     resolution: {integrity: sha512-e3nRfgfUZ4rNGL232gUgX06QNyyez04KdjFrF+LTRoOXmrOgFKDg4BCdsjW8EnT69eqdYGmRpJwiPVYNrCaW3g==}
     engines: {node: '>= 0.4'}
@@ -1378,9 +1371,6 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
-
-  tslib@2.6.2:
-    resolution: {integrity: sha512-AEYxH93jGFPn/a2iVAwW87VuUIkR1FVUKB77NwMF7nBTDkDrrT/Hpt/IrCJ0QXhW27jTBDcf5ZY7w6RiqTMw2Q==}
 
   tsup@8.4.0:
     resolution: {integrity: sha512-b+eZbPCjz10fRryaAA7C8xlIHnf8VnsaRqydheLIqwG/Mcpfk8Z5zp3HayX7GaTygkigHl5cBUs+IhcySiIexQ==}
@@ -2065,10 +2055,6 @@ snapshots:
   end-of-stream@1.4.4:
     dependencies:
       once: 1.4.0
-
-  envalid@8.0.0:
-    dependencies:
-      tslib: 2.6.2
 
   es-define-property@1.0.1: {}
 
@@ -2761,8 +2747,6 @@ snapshots:
   tsconfck@3.1.5(typescript@5.8.3):
     optionalDependencies:
       typescript: 5.8.3
-
-  tslib@2.6.2: {}
 
   tsup@8.4.0(postcss@8.5.3)(tsx@4.19.3)(typescript@5.8.3)(yaml@2.7.1):
     dependencies:

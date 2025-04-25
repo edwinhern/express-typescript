@@ -1,90 +1,58 @@
 import { randomUUID } from "node:crypto";
-import type { IncomingMessage, ServerResponse } from "node:http";
-import type { Request, RequestHandler, Response } from "express";
-import { StatusCodes, getReasonPhrase } from "http-status-codes";
-import type { LevelWithSilent } from "pino";
-import { type CustomAttributeKeys, type Options, pinoHttp } from "pino-http";
+import type { NextFunction, Request, Response } from "express";
+import { StatusCodes } from "http-status-codes";
+import pino from "pino";
+import pinoHttp from "pino-http";
 
 import { env } from "@/common/utils/envConfig";
 
-enum LogLevel {
-	Fatal = "fatal",
-	Error = "error",
-	Warn = "warn",
-	Info = "info",
-	Debug = "debug",
-	Trace = "trace",
-	Silent = "silent",
-}
-
-type PinoCustomProps = {
-	request: Request;
-	response: Response;
-	error: Error;
-	responseBody: unknown;
-};
-
-const requestLogger = (options?: Options): RequestHandler[] => {
-	const pinoOptions: Options = {
-		enabled: env.isProduction,
-		customProps: customProps as unknown as Options["customProps"],
-		redact: [],
-		genReqId,
-		customLogLevel,
-		customSuccessMessage,
-		customReceivedMessage: (req) => `request received: ${req.method}`,
-		customErrorMessage: (_req, res) => `request errored with status code: ${res.statusCode}`,
-		customAttributeKeys,
-		...options,
-	};
-	return [responseBodyMiddleware, pinoHttp(pinoOptions)];
-};
-
-const customAttributeKeys: CustomAttributeKeys = {
-	req: "request",
-	res: "response",
-	err: "error",
-	responseTime: "timeTaken",
-};
-
-const customProps = (req: Request, res: Response): PinoCustomProps => ({
-	request: req,
-	response: res,
-	error: res.locals.err,
-	responseBody: res.locals.responseBody,
+const logger = pino({
+	level: env.isProduction ? "info" : "debug",
+	transport: env.isProduction ? undefined : { target: "pino-pretty" },
 });
 
-const responseBodyMiddleware: RequestHandler = (_req, res, next) => {
-	const isNotProduction = !env.isProduction;
-	if (isNotProduction) {
+const getLogLevel = (status: number) => {
+	if (status >= StatusCodes.INTERNAL_SERVER_ERROR) return "error";
+	if (status >= StatusCodes.BAD_REQUEST) return "warn";
+	return "info";
+};
+
+const addRequestId = (req: Request, res: Response, next: NextFunction) => {
+	const existingId = req.headers["x-request-id"] as string;
+	const requestId = existingId || randomUUID();
+
+	// Set for downstream use
+	req.headers["x-request-id"] = requestId;
+	res.setHeader("X-Request-Id", requestId);
+
+	next();
+};
+
+const httpLogger = pinoHttp({
+	logger,
+	genReqId: (req) => req.headers["x-request-id"] as string,
+	customLogLevel: (_req, res) => getLogLevel(res.statusCode),
+	customSuccessMessage: (req) => `${req.method} ${req.url} completed`,
+	customErrorMessage: (_req, res) => `Request failed with status code: ${res.statusCode}`,
+	// Only log response bodies in development
+	serializers: {
+		req: (req) => ({
+			method: req.method,
+			url: req.url,
+			id: req.id,
+		}),
+	},
+});
+
+const captureResponseBody = (req: Request, res: Response, next: NextFunction) => {
+	if (!env.isProduction) {
 		const originalSend = res.send;
-		res.send = (content) => {
-			res.locals.responseBody = content;
-			res.send = originalSend;
-			return originalSend.call(res, content);
+		res.send = function (body) {
+			res.locals.responseBody = body;
+			return originalSend.call(this, body);
 		};
 	}
 	next();
 };
 
-const customLogLevel = (_req: IncomingMessage, res: ServerResponse<IncomingMessage>, err?: Error): LevelWithSilent => {
-	if (err || res.statusCode >= StatusCodes.INTERNAL_SERVER_ERROR) return LogLevel.Error;
-	if (res.statusCode >= StatusCodes.BAD_REQUEST) return LogLevel.Warn;
-	if (res.statusCode >= StatusCodes.MULTIPLE_CHOICES) return LogLevel.Silent;
-	return LogLevel.Info;
-};
-
-const customSuccessMessage = (req: IncomingMessage, res: ServerResponse<IncomingMessage>) => {
-	if (res.statusCode === StatusCodes.NOT_FOUND) return getReasonPhrase(StatusCodes.NOT_FOUND);
-	return `${req.method} completed`;
-};
-
-const genReqId = (req: IncomingMessage, res: ServerResponse<IncomingMessage>) => {
-	const existingID = req.id ?? req.headers["x-request-id"];
-	if (existingID) return existingID;
-	const id = randomUUID();
-	res.setHeader("X-Request-Id", id);
-	return id;
-};
-
-export default requestLogger();
+export default [addRequestId, captureResponseBody, httpLogger];
