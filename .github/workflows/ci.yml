@@ -85,8 +85,12 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ github.workflow }}-${{ github.job }}
-          cache-to: type=gha,mode=max,scope=${{ github.workflow }}-${{ github.job }}
+          cache-from: |
+            type=gha,scope=${{ github.ref_name }}-${{ github.job }}
+            type=registry,ref=ghcr.io/${{ github.repository }}:buildcache
+          cache-to: |
+            type=gha,mode=max,scope=${{ github.ref_name }}-${{ github.job }}
+            type=registry,ref=ghcr.io/${{ github.repository }}:buildcache,mode=max
 
   summary:
     name: Workflow Summary
