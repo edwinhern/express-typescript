@@ -56,9 +56,6 @@ jobs:
       # Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:v0.12.0
       # Login to GitHub Container Registry
       - name: Login to GitHub Container Registry
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
@@ -88,8 +85,8 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ github.workflow }}-${{ github.job }}
+          cache-to: type=gha,mode=max,scope=${{ github.workflow }}-${{ github.job }}
 
   summary:
     name: Workflow Summary
