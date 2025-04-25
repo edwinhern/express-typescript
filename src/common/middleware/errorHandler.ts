@@ -2,7 +2,7 @@ import type { ErrorRequestHandler, RequestHandler } from "express";
 import { StatusCodes } from "http-status-codes";
 
 const unexpectedRequest: RequestHandler = (_req, res) => {
-	res.sendStatus(StatusCodes.NOT_FOUND);
+	res.status(StatusCodes.NOT_FOUND).send("Not Found");
 };
 
 const addErrorToRequestLog: ErrorRequestHandler = (err, _req, res, next) => {

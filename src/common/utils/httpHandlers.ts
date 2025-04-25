@@ -4,10 +4,6 @@ import type { ZodError, ZodSchema } from "zod";
 
 import { ServiceResponse } from "@/common/models/serviceResponse";
 
-export const handleServiceResponse = (serviceResponse: ServiceResponse<unknown>, response: Response) => {
-	return response.status(serviceResponse.statusCode).send(serviceResponse);
-};
-
 export const validateRequest = (schema: ZodSchema) => (req: Request, res: Response, next: NextFunction) => {
 	try {
 		schema.parse({ body: req.body, query: req.query, params: req.params });
@@ -16,6 +12,6 @@ export const validateRequest = (schema: ZodSchema) => (req: Request, res: Respon
 		const errorMessage = `Invalid input: ${(err as ZodError).errors.map((e) => e.message).join(", ")}`;
 		const statusCode = StatusCodes.BAD_REQUEST;
 		const serviceResponse = ServiceResponse.failure(errorMessage, null, statusCode);
-		return handleServiceResponse(serviceResponse, res);
+		res.status(serviceResponse.statusCode).send(serviceResponse);
 	}
 };
