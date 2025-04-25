@@ -1,35 +1,38 @@
 name: "Setup pnpm"
-description: "Sets up pnpm with caching"
+description: "Sets up pnpm with caching and installation"
 
 runs:
   using: composite
   steps:
-    - name: Extract pnpm version from .tool-versions
-      id: pnpm-version
+    - name: Extract versions from .tool-versions
+      id: versions
       shell: bash
       run: |
+        NODE_VERSION=$(grep 'nodejs' .tool-versions | awk '{print $1}')
         PNPM_VERSION=$(grep 'pnpm' .tool-versions | awk '{print $2}')
-        echo "Using pnpm version: $PNPM_VERSION"
-        echo "version=$PNPM_VERSION" >> $GITHUB_OUTPUT
+        echo "node=$NODE_VERSION" >> $GITHUB_OUTPUT
+        echo "pnpm=$PNPM_VERSION" >> $GITHUB_OUTPUT
 
     - name: Setup pnpm
       uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
       with:
-        version: ${{ steps.pnpm-version.outputs.version }}
+        version: ${{ steps.versions.outputs.pnpm }}
 
     - name: Get pnpm store directory
       shell: bash
-      run: |
-        echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
     - name: Restore pnpm cache
       uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
       with:
-        path: ${{ env.STORE_PATH }}
-        key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+        path: |
+          ${{ env.STORE_PATH }}
+          node_modules
+          .pnpm-store
+        key: ${{ runner.os }}-node-${{ steps.versions.outputs.node }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
         restore-keys: |
-          ${{ runner.os }}-pnpm-
+          ${{ runner.os }}-node-${{ steps.versions.outputs.node }}-pnpm-
 
     - name: Install dependencies
       shell: bash
-      run: pnpm install
+      run: pnpm install --frozen-lockfile
