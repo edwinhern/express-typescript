@@ -61,7 +61,7 @@ importers:
         specifier: 3.1.2
         version: 3.1.2(vitest@3.1.2(@types/node@22.15.2)(tsx@4.19.3)(yaml@2.7.1))
       pino-pretty:
-        specifier: ^13.0.0
+        specifier: 13.0.0
         version: 13.0.0
       supertest:
         specifier: 7.1.0
@@ -73,7 +73,7 @@ importers:
         specifier: 4.19.3
         version: 4.19.3
       typescript:
-        specifier: ^5.8.3
+        specifier: 5.8.3
         version: 5.8.3
       vite-tsconfig-paths:
         specifier: 5.1.4
