@@ -46,8 +46,8 @@ importers:
         specifier: 1.9.4
         version: 1.9.4
       '@types/cors':
-        specifier: 2.8.17
-        version: 2.8.17
+        specifier: 2.8.18
+        version: 2.8.18
       '@types/express':
         specifier: 5.0.1
         version: 5.0.1
@@ -466,8 +466,8 @@ packages:
   '@types/cookiejar@2.1.5':
     resolution: {integrity: sha512-he+DHOWReW0nghN24E1WUqM0efK4kI9oTqDm6XmK8ZPe2djZ90BSNdGnIyCLzCPw7/pogPlGbzI2wHGGmi4O/Q==}
 
-  '@types/cors@2.8.17':
-    resolution: {integrity: sha512-8CGDvrBj1zgo2qE+oS3pOCyYNqCPryMWY2bGfwA0dcfopWGgxs+78df0Rs3rc9THP4JkOhLsAa+15VdpAqkcUA==}
+  '@types/cors@2.8.18':
+    resolution: {integrity: sha512-nX3d0sxJW41CqQvfOzVG1NCTXfFDrDWIghCZncpHeWlVFd81zxB/DLhg7avFg6eHLCRX7ckBmoIIcqa++upvJA==}
 
   '@types/estree@1.0.7':
     resolution: {integrity: sha512-w28IoSUCJpidD/TGviZwwMJckNESJZXFu7NBZ5YJ4mEUnNraUn9Pm8HSZm/jDF1pDWYKspWE7oVphigUPRakIQ==}
@@ -1779,7 +1779,7 @@ snapshots:
 
   '@types/cookiejar@2.1.5': {}
 
-  '@types/cors@2.8.17':
+  '@types/cors@2.8.18':
     dependencies:
       '@types/node': 22.15.5
 
