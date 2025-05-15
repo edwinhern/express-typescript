@@ -1,5 +1,5 @@
 # Base stage with pnpm setup
-FROM node:23.11.0-slim AS base
+FROM node:23.11.1-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -20,7 +20,7 @@ COPY . .
 RUN pnpm run build
 
 # Final stage - combine production dependencies and build output
-FROM node:23.11.0-alpine AS runner
+FROM node:23.11.1-alpine AS runner
 WORKDIR /app
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
