@@ -28,7 +28,7 @@
 		"pino": "9.7.0",
 		"pino-http": "10.4.0",
 		"swagger-ui-express": "5.0.1",
-		"zod": "3.25.20"
+		"zod": "3.25.23"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "1.9.4",
