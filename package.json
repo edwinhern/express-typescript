@@ -28,7 +28,7 @@
 		"pino": "9.7.0",
 		"pino-http": "10.4.0",
 		"swagger-ui-express": "5.0.1",
-		"zod": "3.25.46"
+		"zod": "3.25.48"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "1.9.4",
@@ -56,5 +56,5 @@
 		"splitting": false,
 		"skipNodeModulesBundle": true
 	},
-	"packageManager": "pnpm@10.11.0"
+	"packageManager": "pnpm@10.11.1"
 }
