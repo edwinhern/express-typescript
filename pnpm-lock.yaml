@@ -10,7 +10,7 @@ importers:
     dependencies:
       '@asteasolutions/zod-to-openapi':
         specifier: 7.3.2
-        version: 7.3.2(zod@3.25.50)
+        version: 7.3.2(zod@3.25.51)
       cors:
         specifier: 2.8.5
         version: 2.8.5
@@ -39,8 +39,8 @@ importers:
         specifier: 5.0.1
         version: 5.0.1(express@5.1.0)
       zod:
-        specifier: 3.25.50
-        version: 3.25.50
+        specifier: 3.25.51
+        version: 3.25.51
     devDependencies:
       '@biomejs/biome':
         specifier: 1.9.4
@@ -1574,8 +1574,8 @@ packages:
     engines: {node: '>= 14'}
     hasBin: true
 
-  zod@3.25.50:
-    resolution: {integrity: sha512-VstOnRxf4tlSq0raIwbn0n+LA34SxVoZ8r3pkwSUM0jqNiA/HCMQEVjTuS5FZmHsge+9MDGTiAuHyml5T0um6A==}
+  zod@3.25.51:
+    resolution: {integrity: sha512-TQSnBldh+XSGL+opiSIq0575wvDPqu09AqWe1F7JhUMKY+M91/aGlK4MhpVNO7MgYfHcVCB1ffwAUTJzllKJqg==}
 
 snapshots:
 
@@ -1584,10 +1584,10 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.8
       '@jridgewell/trace-mapping': 0.3.25
 
-  '@asteasolutions/zod-to-openapi@7.3.2(zod@3.25.50)':
+  '@asteasolutions/zod-to-openapi@7.3.2(zod@3.25.51)':
     dependencies:
       openapi3-ts: 4.4.0
-      zod: 3.25.50
+      zod: 3.25.51
 
   '@babel/helper-string-parser@7.27.1': {}
 
@@ -3012,4 +3012,4 @@ snapshots:
 
   yaml@2.7.1: {}
 
-  zod@3.25.50: {}
+  zod@3.25.51: {}
