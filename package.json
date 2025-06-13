@@ -18,7 +18,7 @@
 		"check": "pnpm lint && pnpm format && pnpm build && pnpm test"
 	},
 	"dependencies": {
-		"@asteasolutions/zod-to-openapi": "7.3.3",
+		"@asteasolutions/zod-to-openapi": "7.3.4",
 		"cors": "2.8.5",
 		"dotenv": "16.5.0",
 		"express": "5.1.0",
@@ -28,7 +28,7 @@
 		"pino": "9.7.0",
 		"pino-http": "10.5.0",
 		"swagger-ui-express": "5.0.1",
-		"zod": "3.25.63"
+		"zod": "3.25.64"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "1.9.4",
@@ -40,7 +40,7 @@
 		"pino-pretty": "13.0.0",
 		"supertest": "7.1.1",
 		"tsup": "8.5.0",
-		"tsx": "4.20.2",
+		"tsx": "4.20.3",
 		"typescript": "5.8.3",
 		"vite-tsconfig-paths": "5.1.4",
 		"vitest": "3.2.3"
