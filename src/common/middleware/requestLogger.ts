@@ -44,7 +44,7 @@ const httpLogger = pinoHttp({
 	},
 });
 
-const captureResponseBody = (req: Request, res: Response, next: NextFunction) => {
+const captureResponseBody = (_req: Request, res: Response, next: NextFunction) => {
 	if (!env.isProduction) {
 		const originalSend = res.send;
 		res.send = function (body) {
