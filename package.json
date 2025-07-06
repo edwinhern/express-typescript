@@ -11,11 +11,9 @@
 		"build": "tsc && tsup",
 		"start:dev": "node --import=tsx --watch src/index.ts",
 		"start:prod": "node dist/index.js",
-		"lint": "biome lint --fix",
-		"format": "biome format --write",
+		"check": "biome check --write",
 		"test": "vitest run",
-		"test:cov": "vitest run --coverage",
-		"check": "pnpm lint && pnpm format && pnpm build && pnpm test"
+		"test:cov": "vitest run --coverage"
 	},
 	"dependencies": {
 		"@asteasolutions/zod-to-openapi": "7.3.4",
@@ -46,9 +44,14 @@
 		"vitest": "3.2.3"
 	},
 	"tsup": {
-		"entry": ["src/index.ts"],
+		"entry": [
+			"src/index.ts"
+		],
 		"outDir": "dist",
-		"format": ["esm", "cjs"],
+		"format": [
+			"esm",
+			"cjs"
+		],
 		"target": "es2020",
 		"sourcemap": true,
 		"clean": true,
