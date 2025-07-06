@@ -18,7 +18,7 @@
 	"dependencies": {
 		"@asteasolutions/zod-to-openapi": "7.3.4",
 		"cors": "2.8.5",
-		"dotenv": "16.6.1",
+		"dotenv": "17.0.1",
 		"express": "5.1.0",
 		"express-rate-limit": "7.5.1",
 		"helmet": "8.1.0",
