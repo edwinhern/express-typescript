@@ -18,7 +18,7 @@
 	"dependencies": {
 		"@asteasolutions/zod-to-openapi": "7.3.4",
 		"cors": "2.8.5",
-		"dotenv": "17.0.1",
+		"dotenv": "17.1.0",
 		"express": "5.1.0",
 		"express-rate-limit": "7.5.1",
 		"helmet": "8.1.0",
@@ -26,7 +26,7 @@
 		"pino": "9.7.0",
 		"pino-http": "10.5.0",
 		"swagger-ui-express": "5.0.1",
-		"zod": "3.25.75"
+		"zod": "3.25.76"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.0.6",
