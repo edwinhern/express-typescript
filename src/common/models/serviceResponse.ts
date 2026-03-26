@@ -23,7 +23,7 @@ export class ServiceResponse<T = null> {
 	}
 }
 
-export const ServiceResponseSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>
+export const ServiceResponseSchema = <T extends z.ZodType>(dataSchema: T) =>
 	z.object({
 		success: z.boolean(),
 		message: z.string(),
